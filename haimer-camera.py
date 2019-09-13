@@ -24,15 +24,16 @@ c_black_outer_mask_e = (125, 135)
 c_inner_mask_r = 20
 c_red_outer_mask_r = 88
 
-# minLinLength for black arrow needs to be larger than the height of the HAIMER label
 c_black_hough_threshold = 5
-c_black_hough_min_line_length = 22
+c_black_hough_min_line_length = 22 # needs to be larger than the height of the HAIMER label
 c_black_hough_max_line_gap = 2
-c_black_ll = 300
+c_black_drawn_line_length = 300
 c_red_hough_threshold = 5
 c_red_hough_min_line_length = 10
 c_red_hough_max_line_gap = 2
-c_red_ll = 200
+c_red_drawn_line_length = 200
+
+c_final_image_scale_factor = 1.
 
 
 def c_image_center(w, h):
@@ -246,8 +247,9 @@ def black_arrow_segment(image, image_center):
     image = cv2.bitwise_and(image, mask)
 
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV_FULL)
+    sat = hsv[:, :, 1] < 80
     val = hsv[:, :, 2] < 180
-    seg = val * mask[:, :, 0]
+    seg = sat * val * mask[:, :, 0]
 
     return image, seg
 
@@ -292,11 +294,11 @@ def arrow_common(image, image_center, seg_func, hough_threshold, hough_min_line_
 
 
 def black_arrow(image, image_center):
-    return arrow_common(image, image_center, black_arrow_segment, c_black_hough_threshold, c_black_hough_min_line_length, c_black_hough_max_line_gap, c_black_ll)
+    return arrow_common(image, image_center, black_arrow_segment, c_black_hough_threshold, c_black_hough_min_line_length, c_black_hough_max_line_gap, c_black_drawn_line_length)
 
 
 def red_arrow(image, image_center):
-    return arrow_common(image, image_center, red_arrow_segment, c_red_hough_threshold, c_red_hough_min_line_length, c_red_hough_max_line_gap, c_red_ll)
+    return arrow_common(image, image_center, red_arrow_segment, c_red_hough_threshold, c_red_hough_min_line_length, c_red_hough_max_line_gap, c_red_drawn_line_length)
 
 
 def draw_labels(image, theta1, theta2):
@@ -339,6 +341,14 @@ def draw_labels(image, theta1, theta2):
     cv2.putText(image, f'r {theta2:.2f} {rr:.2f}', (20, 60), font, 1, (255, 255, 255))
 
 
+def append_v(lst, v, n=1):
+    if v is None:
+        return lst
+    if len(lst) > n:
+        lst.pop(0)
+    lst.append(v)
+
+
 fps_lst = []
 fps_t1 = None
 
@@ -350,9 +360,7 @@ def draw_fps(image):
         fps_t1 = time.time()
         return
     t2 = time.time()
-    if len(fps_lst) > 90:
-        fps_lst = fps_lst[1:]
-    fps_lst = [1. / (t2 - fps_t1)] + fps_lst
+    append_v(fps_lst, 1. / (t2 - fps_t1), 90)
     fps_t1 = t2
 
     fps = np.mean(fps_lst)
@@ -402,22 +410,11 @@ def main():
         seg2 = cv2.cvtColor(seg2, cv2.COLOR_GRAY2BGR)
         skel2 = cv2.cvtColor(skel2, cv2.COLOR_GRAY2BGR)
 
-        # Maintain a list of thetas to average to reduce noise and to fill in
-        # during times where not measurements are available such as when the
-        # black hand passes over the red hand
-        # print(theta1, theta2)
-        if theta1:
-            if theta1 < 0.:
-                theta1 += math.pi * 2
-            if len(theta1_l) > 1:
-                theta1_l = theta1_l[:-1]
-            theta1_l = [theta1] + theta1_l
-        if theta2:
-            if theta2 < 0.:
-                theta2 += math.pi * 2
-            if len(theta2_l) > 1:
-                theta2_l = theta2_l[:-1]
-            theta2_l = [theta2] + theta2_l
+        # Average valid thetas to reduce noise and to fill in during times where
+        # no measurements are available such as when the black hand passes over
+        # the red hand.
+        append_v(theta1_l, theta1)
+        append_v(theta2_l, theta2)
 
         image0 = image.copy()
         cv2.circle(image0, (image_center), c_inner_mask_r // 2, (0, 0, 255), 1)
@@ -430,44 +427,46 @@ def main():
                  (image_center[0] + c_inner_mask_r, image_center[1] - c_inner_mask_r),
                  (0, 0, 255), 1)
 
-        # black arrow
+        # Draw black arrow mask
         cv2.circle(image0, image_center, c_black_outer_mask_r, (0, 255, 255), 1)
         cv2.ellipse(image0, image_center, c_black_outer_mask_e, 0, 0, 360, (0, 255, 255), 1)
         cv2.circle(image0, image_center, c_inner_mask_r, (0, 255, 255), 1)
 
-        # red arrow
+        # Draw red arrow mask
         cv2.circle(image0, image_center, c_red_outer_mask_r, (0, 255, 255), 1)
         cv2.circle(image0, image_center, c_inner_mask_r, (0, 255, 255), 1)
 
+        # Draw center of the dial
         mask = np.zeros(image.shape, dtype=image.dtype)
         cv2.circle(mask, image_center, c_dial_outer_mask_r, (255, 255, 255), -1)
         image = cv2.bitwise_and(image, mask)
 
+        # Draw calculated red and black arrows
         if theta1_l and theta2_l:
             theta1m = mean_angles(theta1_l)
-            if theta1m < 0:
-                theta1m += math.pi * 2
+            # if theta1m < 0:
+            #     theta1m += math.pi * 2
             theta1 = theta1m
 
             theta2m = mean_angles(theta2_l)
-            if theta2m < 0:
-                theta2m += math.pi * 2
+            # if theta2m < 0:
+            #     theta2m += math.pi * 2
             theta2 = theta2m
 
-            plot_lines2(None, theta1, c_red_ll, image, image_center)
-            plot_lines2(None, theta2, c_black_ll, image, image_center)
+            plot_lines2(None, theta1, c_red_drawn_line_length, image, image_center)
+            plot_lines2(None, theta2, c_black_drawn_line_length, image, image_center)
 
             draw_labels(image, theta1, theta2)
             draw_fps(image)
 
+        # Build and display composite image
         img_all0 = np.vstack([cimg, image0, image])
         img_all1 = np.vstack([seg1, skel1, image1])
         img_all2 = np.vstack([seg2, skel2, image2])
 
         img_all = np.hstack([img_all0, img_all1, img_all2])
         # img_all = img_all1
-        s = 1.
-        img_all = cv2.resize(img_all, None, fx=s, fy=s)
+        img_all = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
         cv2.imshow("Live", img_all)
         if cv2.waitKey(5) >= 0:
