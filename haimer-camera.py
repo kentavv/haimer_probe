@@ -21,9 +21,9 @@ c_haimer_ball_diam = 4  # millimeters
 
 c_dial_outer_mask_r = 220
 
-c_red_angle_start = 1.8780948507158541
-c_red_angle_end = 4.387011637081153
-c_initial_image_rot = -0.062469504755442426
+c_red_angle_start = 1.8905964141903842
+c_red_angle_end = -1.8765860798694562 + 2 * math.pi
+c_initial_image_rot = -.07361130624483032714
 
 c_rho_resolution = 1 / 2  # 1/2 pixel
 c_theta_resolution = np.pi / 180 / 4  # 1/4 degree
@@ -44,7 +44,12 @@ c_red_drawn_line_length = 140
 
 c_final_image_scale_factor = 1.
 
-c_font = cv2.FONT_HERSHEY_DUPLEX
+c_label_font = cv2.FONT_HERSHEY_SIMPLEX
+c_label_color = (255, 255, 255)
+c_label_s = .8
+
+c_line_color = (0, 200, 0)
+c_line_s = 2
 
 
 def c_image_center(w, h):
@@ -62,12 +67,25 @@ def static_vars(**kwargs):
     return decorate
 
 
+def append_v(lst, v, n=1):
+    if v is None:
+        return lst
+    if len(lst) > n:
+        lst.pop(0)
+    lst.append(v)
+
+
 def mean_angles(lst):
     # Because the list of angles can contain both 0 and 2pi,
     # however, 0 and pi are also contained and will average to pi/2,
     # this is thus probably not the best way to do this.
     # https://en.wikipedia.org/wiki/Mean_of_circular_quantities
     return math.atan2(np.mean(np.sin(lst)), np.mean(np.cos(lst)))
+
+
+def difference_of_angles(theta1, theta2):
+    dt = theta1 - theta2
+    return math.atan2(math.sin(dt), math.cos(dt))
 
 
 def list_camera_properties(video_cap):
@@ -201,7 +219,7 @@ def plot_lines(lines, theta, drawn_line_len, image, image_center):
         b = math.sin(theta)
         x0, y0 = image_center
         pt2 = (round(x0 - drawn_line_len * -b), round(y0 - drawn_line_len * a))
-        cv2.line(image, image_center, pt2, (0, 255, 255), 1, cv2.LINE_AA)
+        cv2.line(image, image_center, pt2, c_line_color, c_line_s, cv2.LINE_AA)
 
 
 def summarize_lines(lines, image_center):
@@ -291,7 +309,7 @@ def arrow_common(image, image_center, seg_func, hough_threshold, hough_min_line_
 
     theta = None
     if lines is not None:
-        lines = filter_lines(lines, image_center)
+        lines = filter_lines(lines, image_center, c_inner_mask_r // 4)
         theta = summarize_lines(lines, image_center)
         plot_lines(lines, theta, ll, image, image_center)
 
@@ -306,58 +324,57 @@ def red_arrow(image, image_center):
     return arrow_common(image, image_center, red_arrow_segment, c_red_hough_threshold, c_red_hough_min_line_length, c_red_hough_max_line_gap, c_red_drawn_line_length)
 
 
-def draw_labels(image, theta_b, theta_r):
+@static_vars(tare_lst=[], tare_on=False)
+def calc_mm(theta_b, theta_r):
+    # Blend the course and find measurements of the red and black hands,
+    # respectively and return final measurement.
+
+    if calc_mm.tare_on:
+        append_v(calc_mm.tare_lst, (theta_b, theta_r), 200)
+        print('Tare', len(calc_mm.tare_lst), mean_angles([x[0] for x in calc_mm.tare_lst]), mean_angles([x[1] for x in calc_mm.tare_lst]))
+
     # Thetas come in as [0, Pi] and [-Pi, 0] so change that to [0, 2Pi]
-    if theta_b < 0:
+    if theta_b < 0.:
         theta_b += math.pi * 2
-    if theta_r < 0:
+    if theta_r < 0.:
         theta_r += math.pi * 2
+
+    theta_b = max(0., min(math.pi * 2, theta_b))
+    theta_r = max(0., min(math.pi * 2, theta_r))
 
     # Change thetas to millimeters
     mm_b = theta_b / (math.pi * 2) * 1
-    mm_r = (theta_r - c_red_angle_start) / (c_red_angle_end - c_red_angle_start) * c_haimer_ball_diam - c_haimer_ball_diam / 2
+    mm_r = (theta_r - c_red_angle_start) / (c_red_angle_end - c_red_angle_start) * c_haimer_ball_diam  # - c_haimer_ball_diam / 2
 
-    cc = mm_r - mm_b
-    if mm_r < 0:
-        cc = 1 - mm_b
-    else:
-        cc = mm_b
-    ee = math.modf(abs(mm_r))[0] - cc
+    # The decimal portion of mm_r, to be updated.
+    mm_r_d = math.modf(mm_r)[0]
 
-    yy = [abs(math.modf(mm_b)[0]) * math.pi * 2,
-          abs(math.modf(mm_r)[0]) * math.pi * 2]
-    theta_yy = mean_angles(yy)
-    yy = theta_yy / (math.pi * 2)
+    # Find minimal distance between the black hand, which measure 0-1, and the
+    # decimal part of the red hand, which measures [-2, 2], by treating them
+    # as angles between [0, 2Pi].
+    theta_d = difference_of_angles(theta_b, mm_r_d * math.pi * 2)
+    mm_offset = theta_d / (2 * math.pi)
 
-    ccc = math.modf(mm_r)[1] + math.copysign(yy, mm_r)
+    # Adding the offset to mm_r updates the course red hand measurement with the
+    # finer measurement of the black hand. The two estimates of the [0-1] part,
+    # the decimal portion of mm_r and mm_b, could be weighted, but here only
+    # mm_b is used. Effectively, after the offset is applied, mm_r counts the
+    # number of times the black hand has revolved and mm_b measures the fraction
+    # of rotation of the black hand.
+    mm_blended = mm_r + mm_offset
 
-    ttt = abs(math.modf(mm_r)[0])
-    td1 = abs(ttt - mm_b)
-    td2 = abs((1 - mm_b) + ttt)
-    print(f'aa {mm_b:8.4f} {mm_r:8.4f} {cc:8.4f} {ee:8.4f} {yy:8.4f} {ccc:8.4f} {td1:8.4f} {td2:8.4f}')
+    # Offset the semifinal measurement by half the probe ball diameter.
+    mm_final = mm_blended - c_haimer_ball_diam / 2
 
-    # if ee > .50:
-    #     mm_b = abs(mm_b - 1)
-    #
-    #     cc = mm_r - mm_b
-    #     if mm_r < 0:
-    #         cc = 1 - mm_b
-    #     else:
-    #         cc = mm_b
-    #     ee = math.modf(abs(mm_r))[0] - cc
-    #
-    # print(f'mm_b {mm_b:8.4f} {mm_r:8.4f} {cc:8.4f} {ee:8.4f}')
+    # print(f'{mm_r:8.4f} {mm_b:8.4f} {mm_offset:8.4f} {mm_blended:8.4f} {mm_final:8.4f}')
 
-    cv2.putText(image, f'b {theta_b:.2f} {mm_b:.2f}', (20, 30), c_font, 1, (255, 255, 255))
-    cv2.putText(image, f'r {theta_r:.2f} {mm_r:.2f}', (20, 60), c_font, 1, (255, 255, 255))
+    return mm_final, mm_b, mm_r
 
 
-def append_v(lst, v, n=1):
-    if v is None:
-        return lst
-    if len(lst) > n:
-        lst.pop(0)
-    lst.append(v)
+def draw_labels(image, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final):
+    cv2.putText(image_b, f'{theta_b:5.2f} rad {mm_b:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
+    cv2.putText(image_r, f'{theta_r:5.2f} rad {mm_r:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
+    cv2.putText(image, f'{mm_final:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
 
 
 @static_vars(fps_lst=[], fps_t1=None)
@@ -371,7 +388,102 @@ def draw_fps(image):
 
     fps = np.mean(draw_fps.fps_lst)
 
-    cv2.putText(image, f'fps {fps:.2f}', (20, 90), c_font, 1, (255, 255, 255))
+    cv2.putText(image, f'{fps:.2f} fps', (20, 30 * 2), c_label_font, c_label_s, c_label_color)
+
+
+@static_vars(theta_b_l=[], theta_r_l=[])
+def get_measurement(video_capture):
+    mm_final, mm_b, mm_r = None, None, None
+
+    retval, image0 = video_capture.read()
+    if not retval:
+        print('rv is false')
+        sys.exit(1)
+    if image0.size == 0:
+        print('image0 is empty')
+        sys.exit(1)
+
+    h, w = image0.shape[:2]
+    image_center = c_image_center(w, h)
+
+    m = cv2.getRotationMatrix2D(image_center, c_initial_image_rot / math.pi * 180., 1.0)
+    image1 = cv2.warpAffine(image0, m, (w, h))
+    image2 = image1.copy()
+
+    theta_b, image_b, seg_b, skel_b = black_arrow(image1, image_center)
+    seg_b = cv2.cvtColor(seg_b, cv2.COLOR_GRAY2BGR)
+    skel_b = cv2.cvtColor(skel_b, cv2.COLOR_GRAY2BGR)
+
+    theta_r, image_r, seg_r, skel_r = red_arrow(image1, image_center)
+    seg_r = cv2.cvtColor(seg_r, cv2.COLOR_GRAY2BGR)
+    skel_r = cv2.cvtColor(skel_r, cv2.COLOR_GRAY2BGR)
+
+    # Maintain a list of valid thetas for times when no measurements are
+    # available, such as when the black hand passes over the red hand, and
+    # to use for noise reduction.
+    append_v(get_measurement.theta_b_l, theta_b)
+    append_v(get_measurement.theta_r_l, theta_r)
+
+    if get_measurement.theta_b_l and get_measurement.theta_r_l:
+        theta_b = mean_angles(get_measurement.theta_b_l)
+        theta_r = mean_angles(get_measurement.theta_r_l)
+
+        mm_final, mm_b, mm_r = calc_mm(theta_b, theta_r)
+
+    # Draw outer circle dial and crosshairs on dial pivot.
+    cv2.circle(image1, (image_center), c_dial_outer_mask_r, c_line_color, c_line_s)
+    cv2.line(image1,
+             (image_center[0] - c_inner_mask_r, image_center[1] - c_inner_mask_r),
+             (image_center[0] + c_inner_mask_r, image_center[1] + c_inner_mask_r),
+             c_line_color, 1)
+    cv2.line(image1,
+             (image_center[0] - c_inner_mask_r, image_center[1] + c_inner_mask_r),
+             (image_center[0] + c_inner_mask_r, image_center[1] - c_inner_mask_r),
+             c_line_color, 1)
+
+    # Draw black arrow mask
+    cv2.circle(image1, image_center, c_black_outer_mask_r, c_line_color, c_line_s)
+    cv2.ellipse(image1, image_center, c_black_outer_mask_e, 0, 0, 360, c_line_color, c_line_s)
+    cv2.circle(image1, image_center, c_inner_mask_r, c_line_color, c_line_s)
+
+    # Draw red arrow mask
+    cv2.circle(image1, image_center, c_red_outer_mask_r, c_line_color, c_line_s)
+    cv2.circle(image1, image_center, c_inner_mask_r, c_line_color, c_line_s)
+
+    # Draw final marked up image
+    mask = np.zeros(image2.shape, dtype=image2.dtype)
+    cv2.circle(mask, image_center, c_dial_outer_mask_r, (255, 255, 255), -1)
+    image2 = cv2.bitwise_and(image2, mask)
+
+    # Draw calculated red and black arrows
+    if get_measurement.theta_b_l and get_measurement.theta_r_l:
+        plot_lines(None, theta_b, c_black_drawn_line_length, image2, image_center)
+        plot_lines(None, theta_r, c_red_drawn_line_length, image2, image_center)
+
+        draw_labels(image2, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final)
+
+    draw_fps(image2)
+
+    # Build and display composite image
+    img_all0 = np.vstack([image0, image1, image2])
+    img_all1 = np.vstack([seg_b, skel_b, image_b])
+    img_all2 = np.vstack([seg_r, skel_r, image_r])
+    img_all = np.hstack([img_all0, img_all1, img_all2])
+    img_all = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
+
+    cv2.imshow("Live", img_all)
+    key = cv2.waitKey(5)
+    if key == ord('t'):
+        if calc_mm.tare_on:
+            calc_mm.tare_lst = []
+            calc_mm.tare_on = False
+        else:
+            calc_mm.tare_lst = []
+            calc_mm.tare_on = True
+    elif key >= 0:
+        sys.exit(1)
+
+    return mm_final
 
 
 def main():
@@ -386,85 +498,9 @@ def main():
     # list_camera_properties(video_capture)
     # set_camera_properties(video_capture)
 
-    theta_b_l = []
-    theta_r_l = []
     while True:
-        retval, image0 = video_capture.read()
-        if not retval:
-            print('rv is false')
-            sys.exit(1)
-        if image0.size == 0:
-            print('image0 is empty')
-            sys.exit(1)
-
-        h, w = image0.shape[:2]
-        image_center = c_image_center(w, h)
-
-        m = cv2.getRotationMatrix2D(image_center, c_initial_image_rot / math.pi * 180., 1.0)
-        image1 = cv2.warpAffine(image0, m, (w, h))
-        image2 = image1.copy()
-
-        theta_b, image_b, seg_b, skel_b = black_arrow(image1, image_center)
-        seg_b = cv2.cvtColor(seg_b, cv2.COLOR_GRAY2BGR)
-        skel_b = cv2.cvtColor(skel_b, cv2.COLOR_GRAY2BGR)
-
-        theta_r, image_r, seg_r, skel_r = red_arrow(image1, image_center)
-        seg_r = cv2.cvtColor(seg_r, cv2.COLOR_GRAY2BGR)
-        skel_r = cv2.cvtColor(skel_r, cv2.COLOR_GRAY2BGR)
-
-        # Maintain a list of valid thetas for times when no measurements are
-        # available, such as when the black hand passes over the red hand, and
-        # to use for noise reduction.
-        append_v(theta_b_l, theta_b)
-        append_v(theta_r_l, theta_r)
-
-        if theta_b_l and theta_r_l:
-            theta_b = mean_angles(theta_b_l)
-            theta_r = mean_angles(theta_r_l)
-
-        # Draw center of the dial
-        cv2.circle(image1, (image_center), c_inner_mask_r // 2, (0, 0, 255), 1)
-        cv2.line(image1,
-                 (image_center[0] - c_inner_mask_r, image_center[1] - c_inner_mask_r),
-                 (image_center[0] + c_inner_mask_r, image_center[1] + c_inner_mask_r),
-                 (0, 0, 255), 1)
-        cv2.line(image1,
-                 (image_center[0] - c_inner_mask_r, image_center[1] + c_inner_mask_r),
-                 (image_center[0] + c_inner_mask_r, image_center[1] - c_inner_mask_r),
-                 (0, 0, 255), 1)
-
-        # Draw black arrow mask
-        cv2.circle(image1, image_center, c_black_outer_mask_r, (0, 255, 255), 1)
-        cv2.ellipse(image1, image_center, c_black_outer_mask_e, 0, 0, 360, (0, 255, 255), 1)
-        cv2.circle(image1, image_center, c_inner_mask_r, (0, 255, 255), 1)
-
-        # Draw red arrow mask
-        cv2.circle(image1, image_center, c_red_outer_mask_r, (0, 255, 255), 1)
-        cv2.circle(image1, image_center, c_inner_mask_r, (0, 255, 255), 1)
-
-        # Draw final marked up image
-        mask = np.zeros(image2.shape, dtype=image2.dtype)
-        cv2.circle(mask, image_center, c_dial_outer_mask_r, (255, 255, 255), -1)
-        image2 = cv2.bitwise_and(image2, mask)
-
-        # Draw calculated red and black arrows
-        if theta_b_l and theta_r_l:
-            plot_lines(None, theta_b, c_black_drawn_line_length, image2, image_center)
-            plot_lines(None, theta_r, c_red_drawn_line_length, image2, image_center)
-            draw_labels(image2, theta_b, theta_r)
-
-        draw_fps(image2)
-
-        # Build and display composite image
-        img_all0 = np.vstack([image0, image1, image2])
-        img_all1 = np.vstack([seg_b, skel_b, image_b])
-        img_all2 = np.vstack([seg_r, skel_r, image_r])
-        img_all = np.hstack([img_all0, img_all1, img_all2])
-        img_all = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
-
-        cv2.imshow("Live", img_all)
-        if cv2.waitKey(5) >= 0:
-            break
+        mm_final = get_measurement(video_capture)
+        # print('mm_final:', mm_final)
 
 
 if __name__ == "__main__":
