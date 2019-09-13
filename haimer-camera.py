@@ -49,6 +49,17 @@ def c_image_center(w, h):
     return (w // 2 + 14, h // 2 - 4)
 
 
+# Decorator for static variables, from
+# https://stackoverflow.com/questions/279561/what-is-the-python-equivalent-of-static-variables-inside-a-function
+def static_vars(**kwargs):
+    def decorate(func):
+        for k in kwargs:
+            setattr(func, k, kwargs[k])
+        return func
+
+    return decorate
+
+
 def mean_angles(lst):
     # Because the list of angles can contain both 0 and 2pi,
     # however, 0 and pi are also contained and will average to pi/2,
@@ -191,7 +202,7 @@ def plot_lines(lines, theta, drawn_line_len, image, image_center):
         cv2.line(image, image_center, pt2, (0, 255, 255), 1, cv2.LINE_AA)
 
 
-def summarize2(lines, image_center):
+def summarize_lines(lines, image_center):
     aa = []
     for lst in lines:
         x1, y1, x2, y2 = lst[0]
@@ -271,7 +282,7 @@ def arrow_common(image, image_center, seg_func, hough_threshold, hough_min_line_
     # of the dial. So, skip edge detection, and immediately call skeletonization,
     # which is similar to the medial axis of the pointer and immediately useful.
 
-    # Instead of cv2.HoughLines use cv2.HoughLinesP, which may be faster and has
+    # Use cv2.HoughLinesP, which compared to cv2.HoughLines, may be faster and has
     # options for minimal line length.
     lines = cv2.HoughLinesP(skel, c_rho_resolution, c_theta_resolution, hough_threshold,
                             minLineLength=hough_min_line_length, maxLineGap=hough_max_line_gap)
@@ -279,7 +290,7 @@ def arrow_common(image, image_center, seg_func, hough_threshold, hough_min_line_
     theta = None
     if lines is not None:
         lines = filter_lines(lines, image_center)
-        theta = summarize2(lines, image_center)
+        theta = summarize_lines(lines, image_center)
         plot_lines(lines, theta, ll, image, image_center)
 
     return theta, image, seg0, skel
@@ -346,21 +357,16 @@ def append_v(lst, v, n=1):
     lst.append(v)
 
 
-fps_lst = []
-fps_t1 = None
-
-
+@static_vars(fps_lst=[], fps_t1=None)
 def draw_fps(image):
-    global fps_t1, fps_lst
-
-    if fps_t1 is None:
-        fps_t1 = time.time()
+    if draw_fps.fps_t1 is None:
+        draw_fps.fps_t1 = time.time()
         return
     t2 = time.time()
-    append_v(fps_lst, 1. / (t2 - fps_t1), 90)
-    fps_t1 = t2
+    append_v(draw_fps.fps_lst, 1. / (t2 - draw_fps.fps_t1), 90)
+    draw_fps.fps_t1 = t2
 
-    fps = np.mean(fps_lst)
+    fps = np.mean(draw_fps.fps_lst)
 
     font = cv2.FONT_HERSHEY_DUPLEX
     cv2.putText(image, f'fps {fps:.2f}', (20, 90), font, 1, (255, 255, 255))
