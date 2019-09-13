@@ -13,6 +13,8 @@ import numpy as np
 c_red_angle_start = 1.8780948507158541
 c_red_angle_end = 4.387011637081153
 c_initial_image_rot = -0.062469504755442426
+
+
 def c_image_center(w, h):
     return (w // 2 + 25 - 3 + 1 - 5 - 4, h // 2 + 2 - 1 - 5)
 
@@ -141,32 +143,33 @@ def set_camera_properties(video_cap):
             v = lst[2]
             print(nm, video_cap.set(eval(nm), v))
 
+
 def set_camera_properties2(video_cap):
     capture_properties = [('cv2.CAP_PROP_AUTO_EXPOSURE', True, 1.),  # 1. and 3. are valid
                           ('cv2.CAP_PROP_EXPOSURE', True, 20.),  # 'cv2.CAP_PROP_AUTO_EXPOSURE' must be 1. first.
 
                           ('cv2.CAP_PROP_AUTO_WB', True, 0.),
-                          #('cv2.CAP_PROP_WB_TEMPERATURE', True, 2800.),  # 'cv2.CAP_PROP_AUTO_WB' must be 0. first
-                          #('cv2.CAP_PROP_TEMPERATURE', True, 2800.),
+                          # ('cv2.CAP_PROP_WB_TEMPERATURE', True, 2800.),  # 'cv2.CAP_PROP_AUTO_WB' must be 0. first
+                          # ('cv2.CAP_PROP_TEMPERATURE', True, 2800.),
 
                           ('cv2.CAP_PROP_AUTOFOCUS', True, 1.),
-                          #('cv2.CAP_PROP_FOCUS', True, 22.),  # 'cv2.CAP_PROP_AUTOFOCUS' must be 0. first
+                          # ('cv2.CAP_PROP_FOCUS', True, 22.),  # 'cv2.CAP_PROP_AUTOFOCUS' must be 0. first
 
-                          #('cv2.CAP_PROP_ZOOM', True, 0.),  # Valid values [0, 10], but do not change image
+                          # ('cv2.CAP_PROP_ZOOM', True, 0.),  # Valid values [0, 10], but do not change image
 
                           ('cv2.CAP_PROP_FRAME_WIDTH', True, 1280),
                           ('cv2.CAP_PROP_FRAME_HEIGHT', True, 720),
-                          #('cv2.CAP_PROP_FPS', True, 15),
+                          # ('cv2.CAP_PROP_FPS', True, 15),
 
                           ('cv2.CAP_PROP_BRIGHTNESS', True, 200.),
                           ('cv2.CAP_PROP_CONTRAST', True, 5.),
                           ('cv2.CAP_PROP_SATURATION', True, 83.),
 
-                          #('cv2.CAP_PROP_CONVERT_RGB', True, 1.),  # valid values, 0 and 1. If 0, depth will be 2
-                          #('cv2.CAP_PROP_SHARPNESS', True, 25.),
+                          # ('cv2.CAP_PROP_CONVERT_RGB', True, 1.),  # valid values, 0 and 1. If 0, depth will be 2
+                          # ('cv2.CAP_PROP_SHARPNESS', True, 25.),
 
-                          #('cv2.CAP_PROP_BACKLIGHT', True, 0.),
-                          #('cv2.CAP_PROP_BUFFERSIZE', True, 4.),
+                          # ('cv2.CAP_PROP_BACKLIGHT', True, 0.),
+                          # ('cv2.CAP_PROP_BUFFERSIZE', True, 4.),
 
                           ('cv2.CAP_PROP_POS_MSEC', False),
                           ('cv2.CAP_PROP_POS_FRAMES', False),
@@ -301,12 +304,17 @@ def filter_lines2(lines, image_center, cutoff=5):
         # Distance between a point (image center) and a line defined by two
         # points (line found by HoughLinesP)
         # https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
-        d = abs((y2 - y1)*x0 - (x2 - x1) * y0 + x2*y1 - y2*x1) / math.sqrt((y2 - y1)**2 + (x2 - x1)**2)
+        d = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1) / math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
 
         d_lst += [d]
 
         if d < cutoff:
+            # d1 = (x0 - x1) ** 2 + (y0 - y1) ** 2
+            # d2 = (x0 - x2) ** 2 + (y0 - y2) ** 2
+            # if d1 < d2:
             lines2 += [lst]
+        # else:
+        #     lines2 += [[[x2, y2, x1, y2]]]
 
         # pt1[0] -= image_center[0]
         # pt2[0] -= image_center[0]
@@ -339,7 +347,7 @@ def filter_lines2(lines, image_center, cutoff=5):
         # # print(rho, theta, x0, y0, t)
 
     d_lst = sorted(d_lst)
-    print('d_lst', d_lst)
+    # print('d_lst', d_lst)
 
     return lines2
 
@@ -450,7 +458,7 @@ def summarize2(lines, image, image_center, ll):
             theta_radians = math.atan2(delta_y, delta_x) + math.pi / 2
             theta_deg = theta_radians / (2 * math.pi) * 360
 
-            return theta_deg
+            return theta_radians
 
         aa += [h(pt0, pt1), h(pt0, pt2)]
         # print('calc:', aa[-2:])
@@ -462,7 +470,18 @@ def summarize2(lines, image, image_center, ll):
     if aa:
         # print(np.mean(aa), np.median(aa))
 
-        theta = np.mean(aa) / 360. * 2. * math.pi
+        # theta = np.mean(aa) / 360. * 2. * math.pi
+
+        # Because the list of angles can contain both 0 and 2pi,
+        # however, 0 and pi are also contained and will average to pi/2,
+        # this is thus probably not the best way to do this.
+        # https://en.wikipedia.org/wiki/Mean_of_circular_quantities
+        theta2 = math.atan2(np.mean(np.sin(aa)), np.mean(np.cos(aa)))
+        # print(f'theta {theta:.4f} - theta2 {theta2:.4f} = {theta - theta2:.4f}')
+        theta = theta2
+
+        # if 0 < theta < .5:
+        #     abort()
 
         a = math.cos(theta)
         b = math.sin(theta)
@@ -517,7 +536,7 @@ def black_arrow(image, image_center):
     if False:
         cv2.circle(mask, image_center, 290, (255, 255, 255), -1)
     else:
-        cv2.circle(mask, image_center, 290//2, (255, 255, 255), -1)
+        cv2.circle(mask, image_center, 290 // 2, (255, 255, 255), -1)
     # image = image * (mask.astype(image.dtype))
     # image = image * mask
     image = cv2.bitwise_and(image, mask)
@@ -563,12 +582,12 @@ def black_arrow(image, image_center):
     if False:
         lines = cv2.HoughLinesP(dst, rho_resolution, theta_resolution, 10, minLineLength=45, maxLineGap=5)
     else:
-        lines = cv2.HoughLinesP(dst, rho_resolution, theta_resolution, 10//2, minLineLength=45//2, maxLineGap=5//2)
+        lines = cv2.HoughLinesP(dst, rho_resolution, theta_resolution, 10 // 2, minLineLength=45 // 2, maxLineGap=5 // 2)
     theta = None
     if lines is not None:
         # print(lines)
-
-        print('----------------------------1')
+        # print('aaa:', lines)
+        # print('----------------------------1')
         # lines = filter_lines(lines, image_center)
         lines = filter_lines2(lines, image_center)
 
@@ -577,7 +596,9 @@ def black_arrow(image, image_center):
         # summarize(aa, bb, med, image)
 
         theta = summarize2(lines, image, image_center, 300)
-        print('----------------------------2')
+        # theta = -0.001
+        # print('ccc', theta)
+        # print('----------------------------2')
 
     return val0, val, dst, image, theta
 
@@ -618,7 +639,7 @@ def red_arrow(image, image_center):
     if False:
         lines = cv2.HoughLinesP(dst, rho_resolution, theta_resolution, 10, minLineLength=20, maxLineGap=5)
     else:
-        lines = cv2.HoughLinesP(dst, rho_resolution, theta_resolution, 10//2, minLineLength=20//2, maxLineGap=5//2)
+        lines = cv2.HoughLinesP(dst, rho_resolution, theta_resolution, 10 // 2, minLineLength=20 // 2, maxLineGap=5 // 2)
     theta = None
     if lines is not None:
         # print(lines)
@@ -638,12 +659,46 @@ def draw_labels(image, theta1, theta2):
     font = cv2.FONT_HERSHEY_DUPLEX
     bb = theta1 / (math.pi * 2) * 1
     rr = (theta2 - c_red_angle_start) / (c_red_angle_end - c_red_angle_start) * 4 - 2
+
+    cc = rr - bb
+    if rr < 0:
+        cc = 1 - bb
+    else:
+        cc = bb
+    ee = math.modf(abs(rr))[0] - cc
+
+    yy = [abs(math.modf(bb)[0]) * math.pi * 2,
+          abs(math.modf(rr)[0]) * math.pi * 2]
+    theta_yy = math.atan2(np.mean(np.sin(yy)), np.mean(np.cos(yy)))
+    yy = theta_yy / (math.pi * 2)
+
+    ccc = math.modf(rr)[1] + math.copysign(yy, rr)
+
+    ttt = abs(math.modf(rr)[0])
+    td1 = abs(ttt - bb)
+    td2 = abs((1 - bb) + ttt)
+    print(f'aa {bb:8.4f} {rr:8.4f} {cc:8.4f} {ee:8.4f} {yy:8.4f} {ccc:8.4f} {td1:8.4f} {td2:8.4f}')
+
+    # if ee > .50:
+    #     bb = abs(bb - 1)
+    #
+    #     cc = rr - bb
+    #     if rr < 0:
+    #         cc = 1 - bb
+    #     else:
+    #         cc = bb
+    #     ee = math.modf(abs(rr))[0] - cc
+    #
+    # print(f'bb {bb:8.4f} {rr:8.4f} {cc:8.4f} {ee:8.4f}')
+
     cv2.putText(image, f'b {theta1:.2f} {bb:.2f}', (20, 30), font, 1, (255, 255, 255))
     cv2.putText(image, f'r {theta2:.2f} {rr:.2f}', (20, 60), font, 1, (255, 255, 255))
 
 
 lll = []
 t1 = None
+
+
 def draw_fps(image):
     global t1, lll
 
@@ -729,7 +784,7 @@ def main():
         # maintain a list of thetas to average to reduce noise and to fill in
         # during times where not measurements are available such as when the
         # black hand passes over the red hand
-        print(theta1, theta2)
+        # print(theta1, theta2)
         if theta1:
             if theta1 < 0.:
                 theta1 += math.pi * 2
@@ -745,8 +800,8 @@ def main():
 
         image0 = image.copy()
         cv2.circle(image0, (image_center), 15, (0, 0, 255), 1)
-        cv2.line(image0, (image_center[0]-20, image_center[1]-20), (image_center[0]+20, image_center[1]+20), (0, 0, 255), 1)
-        cv2.line(image0, (image_center[0]-20, image_center[1]+20), (image_center[0]+20, image_center[1]-20), (0, 0, 255), 1)
+        cv2.line(image0, (image_center[0] - 20, image_center[1] - 20), (image_center[0] + 20, image_center[1] + 20), (0, 0, 255), 1)
+        cv2.line(image0, (image_center[0] - 20, image_center[1] + 20), (image_center[0] + 20, image_center[1] - 20), (0, 0, 255), 1)
 
         # black arrow
         cv2.circle(image0, image_center, 290 // 2, (0, 255, 255), 1)
@@ -762,12 +817,28 @@ def main():
         image = cv2.bitwise_and(image, mask)
 
         if theta1_l and theta2_l:
-            print(len(theta2_l))
-            theta1m = np.mean(theta1_l)
-            theta2m = np.mean(theta2_l)
-            print(theta1, theta2, theta1m, theta2m)
+            # print(len(theta2_l))
+
+            # Because the list of angles can contain both 0 and 2pi,
+            # however, 0 and pi are also contained and will average to pi/2,
+            # this is thus probably not the best way to do this.
+            # https://en.wikipedia.org/wiki/Mean_of_circular_quantities
+            theta1m = math.atan2(np.mean(np.sin(theta1_l)), np.mean(np.cos(theta1_l)))
+            theta2m = math.atan2(np.mean(np.sin(theta2_l)), np.mean(np.cos(theta2_l)))
+            # theta = theta2
+            #
+            # theta1m = np.mean(theta1_l)
+            # theta2m = np.mean(theta2_l)
+            # print('ddd', theta1, theta2, theta1m, theta2m)
+            if theta1m < 0:
+                theta1m += math.pi * 2
+            if theta2m < 0:
+                theta2m += math.pi * 2
+            # print('eee', theta1m, theta2m)
             theta1 = theta1m
             theta2 = theta2m
+
+            # print('bbb', theta1m, theta1_l)
 
             if True:
                 ll = 300
