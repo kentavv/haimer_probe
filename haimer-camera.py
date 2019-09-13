@@ -25,13 +25,13 @@ c_inner_mask_r = 20
 c_red_outer_mask_r = 88
 
 c_black_hough_threshold = 5
-c_black_hough_min_line_length = 22 # needs to be larger than the height of the HAIMER label
+c_black_hough_min_line_length = 22  # needs to be larger than the height of the HAIMER label
 c_black_hough_max_line_gap = 2
-c_black_drawn_line_length = 300
+c_black_drawn_line_length = 200
 c_red_hough_threshold = 5
 c_red_hough_min_line_length = 10
 c_red_hough_max_line_gap = 2
-c_red_drawn_line_length = 200
+c_red_drawn_line_length = 140
 
 c_final_image_scale_factor = 1.
 
@@ -381,91 +381,87 @@ def main():
     # list_camera_properties(video_capture)
     # set_camera_properties(video_capture)
 
-    theta1_l = []
-    theta2_l = []
+    theta_b_l = []
+    theta_r_l = []
     while True:
-        retval, cimg = video_capture.read()
+        retval, image0 = video_capture.read()
         if not retval:
             print('rv is false')
             sys.exit(1)
-        if cimg.size == 0:
-            print('image is empty')
+        if image0.size == 0:
+            print('image0 is empty')
             sys.exit(1)
 
-        image = cimg
-
-        h, w = image.shape[:2]
+        h, w = image0.shape[:2]
         image_center = c_image_center(w, h)
 
         m = cv2.getRotationMatrix2D(image_center, c_initial_image_rot / math.pi * 180., 1.0)
-        image = cv2.warpAffine(image, m, (w, h))
+        image1 = cv2.warpAffine(image0, m, (w, h))
+        image2 = image1.copy()
 
-        # image = cv2.CLAHE.apply(image)
+        theta_b, image_b, seg_b, skel_b = black_arrow(image1, image_center)
+        seg_b = cv2.cvtColor(seg_b, cv2.COLOR_GRAY2BGR)
+        skel_b = cv2.cvtColor(skel_b, cv2.COLOR_GRAY2BGR)
 
-        theta1, image1, seg1, skel1 = black_arrow(image, image_center)
-        seg1 = cv2.cvtColor(seg1, cv2.COLOR_GRAY2BGR)
-        skel1 = cv2.cvtColor(skel1, cv2.COLOR_GRAY2BGR)
+        theta_r, image_r, seg_r, skel_r = red_arrow(image1, image_center)
+        seg_r = cv2.cvtColor(seg_r, cv2.COLOR_GRAY2BGR)
+        skel_r = cv2.cvtColor(skel_r, cv2.COLOR_GRAY2BGR)
 
-        theta2, image2, seg2, skel2 = red_arrow(image, image_center)
-        seg2 = cv2.cvtColor(seg2, cv2.COLOR_GRAY2BGR)
-        skel2 = cv2.cvtColor(skel2, cv2.COLOR_GRAY2BGR)
+        # Maintain a list of valid thetas for times when no measurements are
+        # available, such as when the black hand passes over the red hand, and
+        # to use for noise reduction.
+        append_v(theta_b_l, theta_b)
+        append_v(theta_r_l, theta_r)
 
-        # Average valid thetas to reduce noise and to fill in during times where
-        # no measurements are available such as when the black hand passes over
-        # the red hand.
-        append_v(theta1_l, theta1)
-        append_v(theta2_l, theta2)
+        if theta_b_l and theta_r_l:
+            theta_b_m = mean_angles(theta_b_l)
+            # if theta_b_m < 0:
+            #     theta_b_m += math.pi * 2
+            theta_b = theta_b_m
 
-        image0 = image.copy()
-        cv2.circle(image0, (image_center), c_inner_mask_r // 2, (0, 0, 255), 1)
-        cv2.line(image0,
+            theta_r_m = mean_angles(theta_r_l)
+            # if theta_r_m < 0:
+            #     theta_r_m += math.pi * 2
+            theta_r = theta_r_m
+
+        # Draw center of the dial
+        cv2.circle(image1, (image_center), c_inner_mask_r // 2, (0, 0, 255), 1)
+        cv2.line(image1,
                  (image_center[0] - c_inner_mask_r, image_center[1] - c_inner_mask_r),
                  (image_center[0] + c_inner_mask_r, image_center[1] + c_inner_mask_r),
                  (0, 0, 255), 1)
-        cv2.line(image0,
+        cv2.line(image1,
                  (image_center[0] - c_inner_mask_r, image_center[1] + c_inner_mask_r),
                  (image_center[0] + c_inner_mask_r, image_center[1] - c_inner_mask_r),
                  (0, 0, 255), 1)
 
         # Draw black arrow mask
-        cv2.circle(image0, image_center, c_black_outer_mask_r, (0, 255, 255), 1)
-        cv2.ellipse(image0, image_center, c_black_outer_mask_e, 0, 0, 360, (0, 255, 255), 1)
-        cv2.circle(image0, image_center, c_inner_mask_r, (0, 255, 255), 1)
+        cv2.circle(image1, image_center, c_black_outer_mask_r, (0, 255, 255), 1)
+        cv2.ellipse(image1, image_center, c_black_outer_mask_e, 0, 0, 360, (0, 255, 255), 1)
+        cv2.circle(image1, image_center, c_inner_mask_r, (0, 255, 255), 1)
 
         # Draw red arrow mask
-        cv2.circle(image0, image_center, c_red_outer_mask_r, (0, 255, 255), 1)
-        cv2.circle(image0, image_center, c_inner_mask_r, (0, 255, 255), 1)
+        cv2.circle(image1, image_center, c_red_outer_mask_r, (0, 255, 255), 1)
+        cv2.circle(image1, image_center, c_inner_mask_r, (0, 255, 255), 1)
 
-        # Draw center of the dial
-        mask = np.zeros(image.shape, dtype=image.dtype)
+        # Draw final marked up image0
+        mask = np.zeros(image2.shape, dtype=image2.dtype)
         cv2.circle(mask, image_center, c_dial_outer_mask_r, (255, 255, 255), -1)
-        image = cv2.bitwise_and(image, mask)
+        image2 = cv2.bitwise_and(image2, mask)
 
         # Draw calculated red and black arrows
-        if theta1_l and theta2_l:
-            theta1m = mean_angles(theta1_l)
-            # if theta1m < 0:
-            #     theta1m += math.pi * 2
-            theta1 = theta1m
+        if theta_b_l and theta_r_l:
+            plot_lines2(None, theta_b, c_black_drawn_line_length, image2, image_center)
+            plot_lines2(None, theta_r, c_red_drawn_line_length, image2, image_center)
+            draw_labels(image2, theta_b, theta_r)
 
-            theta2m = mean_angles(theta2_l)
-            # if theta2m < 0:
-            #     theta2m += math.pi * 2
-            theta2 = theta2m
-
-            plot_lines2(None, theta1, c_red_drawn_line_length, image, image_center)
-            plot_lines2(None, theta2, c_black_drawn_line_length, image, image_center)
-
-            draw_labels(image, theta1, theta2)
-            draw_fps(image)
+        draw_fps(image2)
 
         # Build and display composite image
-        img_all0 = np.vstack([cimg, image0, image])
-        img_all1 = np.vstack([seg1, skel1, image1])
-        img_all2 = np.vstack([seg2, skel2, image2])
-
+        img_all0 = np.vstack([image0, image1, image2])
+        img_all1 = np.vstack([seg_b, skel_b, image_b])
+        img_all2 = np.vstack([seg_r, skel_r, image_r])
         img_all = np.hstack([img_all0, img_all1, img_all2])
-        # img_all = img_all1
         img_all = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
         cv2.imshow("Live", img_all)
