@@ -170,9 +170,9 @@ def filter_lines(lines, image_center, cutoff=5):
     return lines2
 
 
-def plot_lines(lines, theta, ll, image, image_center):
+def plot_lines(lines, theta, drawn_line_len, image, image_center):
     if lines is not None:
-        for i in range(0, len(lines)):
+        for i in range(len(lines)):
             x1, y1, x2, y2 = lines[i][0]
             pt1 = (x1, y1)
             pt2 = (x2, y2)
@@ -184,14 +184,10 @@ def plot_lines(lines, theta, ll, image, image_center):
             cv2.line(image, pt1, pt2, (0, 0, 255), 3, cv2.LINE_AA)
 
     if theta is not None:
-        # if 0 < theta < .5:
-        #     abort()
-
         a = math.cos(theta)
         b = math.sin(theta)
         x0, y0 = image_center
-        # pt1 = (int(x0 + ll * (-b)), int(y0 + ll * (a)))
-        pt2 = (int(x0 - ll * (-b)), int(y0 - ll * (a)))
+        pt2 = (round(x0 - drawn_line_len * -b), round(y0 - drawn_line_len * a))
         cv2.line(image, image_center, pt2, (0, 255, 255), 1, cv2.LINE_AA)
 
 
@@ -298,6 +294,11 @@ def red_arrow(image, image_center):
 
 
 def draw_labels(image, theta1, theta2):
+    if theta1 < 0:
+        theta1 += math.pi * 2
+    if theta2 < 0:
+        theta2 += math.pi * 2
+
     font = cv2.FONT_HERSHEY_DUPLEX
     bb = theta1 / (math.pi * 2) * 1
     rr = (theta2 - c_red_angle_start) / (c_red_angle_end - c_red_angle_start) * c_haimer_ball_diam - c_haimer_ball_diam / 2
