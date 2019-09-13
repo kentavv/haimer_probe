@@ -21,12 +21,17 @@
 #     along with Haimer-Probe.  If not, see <https://www.gnu.org/licenses/>.
 
 
-# Interesting challenges
+# Ideas and observations:
 # 1) The long black pointer passes over the top of the short red pointer.
 # 2) The blue dot created by the LED on the camera changes the hue of the pointer tha
 #    passes under it and then some amount of the pointer is lost.
 # 3) Identify unchanging areas of the image, while the pointer is moving, to
 #    know what features can be subtracted. E.g., the dial face.
+# 4) For each pixel generate a probability of color to detect change.
+# 5) Normalize the image using the uniform dial face.
+# 6) Edge detection of the wedge shape arrows before Hough transform is not as
+#    convenient as skipping edge detection, in which case Hough transform is
+#    a thinning operation is more representative of the midline of the pointer.
 
 import math
 import sys
