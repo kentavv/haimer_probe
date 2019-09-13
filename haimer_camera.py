@@ -1,7 +1,25 @@
 #!/usr/bin/env python3
 
-# Cpyright Kent A. Vander Velden, 2019
-# kent.vandervelden@gmail.com
+# Copyright 2019 Kent A. Vander Velden <kent.vandervelden@gmail.com>
+#
+# If you use this software, please consider contacting me. I'd like to hear
+# about your work.
+#
+# This file is part of Haimer-Probe.
+#
+#     Haimer-Probe is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+#
+#     Haimer-Probe is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with Haimer-Probe.  If not, see <https://www.gnu.org/licenses/>.
+
 
 # Interesting challenges
 # 1) The long black pointer passes over the top of the short red pointer.
@@ -486,17 +504,22 @@ def get_measurement(video_capture):
     return mm_final
 
 
-def main():
+def gauge_vision_setup():
     np.set_printoptions(precision=2)
 
     video_capture = cv2.VideoCapture(0)
-
     if not video_capture.isOpened():
         print('camera is not open')
         sys.exit(1)
 
     # list_camera_properties(video_capture)
     # set_camera_properties(video_capture)
+
+    return video_capture
+
+
+def main():
+    video_capture = gauge_vision_setup()
 
     while True:
         mm_final = get_measurement(video_capture)
