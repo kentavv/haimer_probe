@@ -44,6 +44,8 @@ c_red_drawn_line_length = 140
 
 c_final_image_scale_factor = 1.
 
+c_font = cv2.FONT_HERSHEY_DUPLEX
+
 
 def c_image_center(w, h):
     return (w // 2 + 14, h // 2 - 4)
@@ -304,49 +306,50 @@ def red_arrow(image, image_center):
     return arrow_common(image, image_center, red_arrow_segment, c_red_hough_threshold, c_red_hough_min_line_length, c_red_hough_max_line_gap, c_red_drawn_line_length)
 
 
-def draw_labels(image, theta1, theta2):
-    if theta1 < 0:
-        theta1 += math.pi * 2
-    if theta2 < 0:
-        theta2 += math.pi * 2
+def draw_labels(image, theta_b, theta_r):
+    # Thetas come in as [0, Pi] and [-Pi, 0] so change that to [0, 2Pi]
+    if theta_b < 0:
+        theta_b += math.pi * 2
+    if theta_r < 0:
+        theta_r += math.pi * 2
 
-    font = cv2.FONT_HERSHEY_DUPLEX
-    bb = theta1 / (math.pi * 2) * 1
-    rr = (theta2 - c_red_angle_start) / (c_red_angle_end - c_red_angle_start) * c_haimer_ball_diam - c_haimer_ball_diam / 2
+    # Change thetas to millimeters
+    mm_b = theta_b / (math.pi * 2) * 1
+    mm_r = (theta_r - c_red_angle_start) / (c_red_angle_end - c_red_angle_start) * c_haimer_ball_diam - c_haimer_ball_diam / 2
 
-    cc = rr - bb
-    if rr < 0:
-        cc = 1 - bb
+    cc = mm_r - mm_b
+    if mm_r < 0:
+        cc = 1 - mm_b
     else:
-        cc = bb
-    ee = math.modf(abs(rr))[0] - cc
+        cc = mm_b
+    ee = math.modf(abs(mm_r))[0] - cc
 
-    yy = [abs(math.modf(bb)[0]) * math.pi * 2,
-          abs(math.modf(rr)[0]) * math.pi * 2]
+    yy = [abs(math.modf(mm_b)[0]) * math.pi * 2,
+          abs(math.modf(mm_r)[0]) * math.pi * 2]
     theta_yy = mean_angles(yy)
     yy = theta_yy / (math.pi * 2)
 
-    ccc = math.modf(rr)[1] + math.copysign(yy, rr)
+    ccc = math.modf(mm_r)[1] + math.copysign(yy, mm_r)
 
-    ttt = abs(math.modf(rr)[0])
-    td1 = abs(ttt - bb)
-    td2 = abs((1 - bb) + ttt)
-    print(f'aa {bb:8.4f} {rr:8.4f} {cc:8.4f} {ee:8.4f} {yy:8.4f} {ccc:8.4f} {td1:8.4f} {td2:8.4f}')
+    ttt = abs(math.modf(mm_r)[0])
+    td1 = abs(ttt - mm_b)
+    td2 = abs((1 - mm_b) + ttt)
+    print(f'aa {mm_b:8.4f} {mm_r:8.4f} {cc:8.4f} {ee:8.4f} {yy:8.4f} {ccc:8.4f} {td1:8.4f} {td2:8.4f}')
 
     # if ee > .50:
-    #     bb = abs(bb - 1)
+    #     mm_b = abs(mm_b - 1)
     #
-    #     cc = rr - bb
-    #     if rr < 0:
-    #         cc = 1 - bb
+    #     cc = mm_r - mm_b
+    #     if mm_r < 0:
+    #         cc = 1 - mm_b
     #     else:
-    #         cc = bb
-    #     ee = math.modf(abs(rr))[0] - cc
+    #         cc = mm_b
+    #     ee = math.modf(abs(mm_r))[0] - cc
     #
-    # print(f'bb {bb:8.4f} {rr:8.4f} {cc:8.4f} {ee:8.4f}')
+    # print(f'mm_b {mm_b:8.4f} {mm_r:8.4f} {cc:8.4f} {ee:8.4f}')
 
-    cv2.putText(image, f'b {theta1:.2f} {bb:.2f}', (20, 30), font, 1, (255, 255, 255))
-    cv2.putText(image, f'r {theta2:.2f} {rr:.2f}', (20, 60), font, 1, (255, 255, 255))
+    cv2.putText(image, f'b {theta_b:.2f} {mm_b:.2f}', (20, 30), c_font, 1, (255, 255, 255))
+    cv2.putText(image, f'r {theta_r:.2f} {mm_r:.2f}', (20, 60), c_font, 1, (255, 255, 255))
 
 
 def append_v(lst, v, n=1):
@@ -368,8 +371,7 @@ def draw_fps(image):
 
     fps = np.mean(draw_fps.fps_lst)
 
-    font = cv2.FONT_HERSHEY_DUPLEX
-    cv2.putText(image, f'fps {fps:.2f}', (20, 90), font, 1, (255, 255, 255))
+    cv2.putText(image, f'fps {fps:.2f}', (20, 90), c_font, 1, (255, 255, 255))
 
 
 def main():
