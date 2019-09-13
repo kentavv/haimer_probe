@@ -3,12 +3,21 @@
 # Cpyright Kent A. Vander Velden, 2019
 # kent.vandervelden@gmail.com
 
+# Interesting challenges
+# 1) The long black pointer passes over the top of the short red pointer.
+# 2) The blue dot created by the LED on the camera changes the hue of the pointer tha
+#    passes under it and then some amount of the pointer is lost.
+# 3) Identify unchanging areas of the image, while the pointer is moving, to
+#    know what features can be subtracted. E.g., the dial face.
+
 import math
 import sys
 import time
 
 import cv2
 import numpy as np
+
+c_haimer_ball_diam = 4  # millimeters
 
 c_dial_outer_mask_r = 220
 
@@ -37,13 +46,8 @@ c_final_image_scale_factor = 1.
 
 
 def c_image_center(w, h):
-    return (w // 2 + 25 - 3 + 1 - 5 - 4, h // 2 + 2 - 1 - 5)
+    return (w // 2 + 14, h // 2 - 4)
 
-
-# Interesting challenges
-# 1) The long black pointer passes over the top of the short red pointer.
-# 2) The blue dot created by the LED on the camera changes the hue of the pointer tha
-#    passes under it and then some amount of the pointer is lost.
 
 def mean_angles(lst):
     # Because the list of angles can contain both 0 and 2pi,
@@ -115,14 +119,6 @@ def set_camera_properties(video_cap):
         print(nm, video_cap.set(eval(nm), v))
 
 
-def find_skeleton3_(img):
-    from skimage.morphology import skeletonize
-    return (skeletonize(img // 255) * 255).astype(np.uint8), 1
-    # return (medial_axis(img//255) * 255).astype(np.uint8), 1
-    # img = skeletonize(img, method='zhang')
-    # img = skeletonize(img, method='lee')
-
-
 # Surprisingly, there is no skeletonization method in OpenCV. It seems common
 # that people implement topological skeleton, i.e., thinning using mathematical
 # morphology operators. This method may leave many small branches to be pruned.
@@ -157,7 +153,7 @@ def find_skeleton(img):
             return skeleton, iters
 
 
-def filter_lines2(lines, image_center, cutoff=5):
+def filter_lines(lines, image_center, cutoff=5):
     lines2 = []
     for lst in lines:
         x1, y1, x2, y2 = lst[0]
@@ -174,7 +170,7 @@ def filter_lines2(lines, image_center, cutoff=5):
     return lines2
 
 
-def plot_lines2(lines, theta, ll, image, image_center):
+def plot_lines(lines, theta, ll, image, image_center):
     if lines is not None:
         for i in range(0, len(lines)):
             x1, y1, x2, y2 = lines[i][0]
@@ -286,9 +282,9 @@ def arrow_common(image, image_center, seg_func, hough_threshold, hough_min_line_
 
     theta = None
     if lines is not None:
-        lines = filter_lines2(lines, image_center)
+        lines = filter_lines(lines, image_center)
         theta = summarize2(lines, image_center)
-        plot_lines2(lines, theta, ll, image, image_center)
+        plot_lines(lines, theta, ll, image, image_center)
 
     return theta, image, seg0, skel
 
@@ -304,7 +300,7 @@ def red_arrow(image, image_center):
 def draw_labels(image, theta1, theta2):
     font = cv2.FONT_HERSHEY_DUPLEX
     bb = theta1 / (math.pi * 2) * 1
-    rr = (theta2 - c_red_angle_start) / (c_red_angle_end - c_red_angle_start) * 4 - 2
+    rr = (theta2 - c_red_angle_start) / (c_red_angle_end - c_red_angle_start) * c_haimer_ball_diam - c_haimer_ball_diam / 2
 
     cc = rr - bb
     if rr < 0:
@@ -444,15 +440,15 @@ def main():
         cv2.circle(image1, image_center, c_red_outer_mask_r, (0, 255, 255), 1)
         cv2.circle(image1, image_center, c_inner_mask_r, (0, 255, 255), 1)
 
-        # Draw final marked up image0
+        # Draw final marked up image
         mask = np.zeros(image2.shape, dtype=image2.dtype)
         cv2.circle(mask, image_center, c_dial_outer_mask_r, (255, 255, 255), -1)
         image2 = cv2.bitwise_and(image2, mask)
 
         # Draw calculated red and black arrows
         if theta_b_l and theta_r_l:
-            plot_lines2(None, theta_b, c_black_drawn_line_length, image2, image_center)
-            plot_lines2(None, theta_r, c_red_drawn_line_length, image2, image_center)
+            plot_lines(None, theta_b, c_black_drawn_line_length, image2, image_center)
+            plot_lines(None, theta_r, c_red_drawn_line_length, image2, image_center)
             draw_labels(image2, theta_b, theta_r)
 
         draw_fps(image2)
