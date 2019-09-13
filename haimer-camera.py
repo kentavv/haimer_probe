@@ -410,15 +410,8 @@ def main():
         append_v(theta_r_l, theta_r)
 
         if theta_b_l and theta_r_l:
-            theta_b_m = mean_angles(theta_b_l)
-            # if theta_b_m < 0:
-            #     theta_b_m += math.pi * 2
-            theta_b = theta_b_m
-
-            theta_r_m = mean_angles(theta_r_l)
-            # if theta_r_m < 0:
-            #     theta_r_m += math.pi * 2
-            theta_r = theta_r_m
+            theta_b = mean_angles(theta_b_l)
+            theta_r = mean_angles(theta_r_l)
 
         # Draw center of the dial
         cv2.circle(image1, (image_center), c_inner_mask_r // 2, (0, 0, 255), 1)
