@@ -34,6 +34,7 @@
 #    a thinning operation is more representative of the midline of the pointer.
 
 import math
+import os
 import sys
 import time
 
@@ -492,11 +493,20 @@ def get_measurement(video_capture):
     img_all1 = np.vstack([seg_b, skel_b, image_b])
     img_all2 = np.vstack([seg_r, skel_r, image_r])
     img_all = np.hstack([img_all0, img_all1, img_all2])
-    img_all = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
+    img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
-    cv2.imshow("Live", img_all)
+    cv2.imshow("Live", img_all_resized)
     key = cv2.waitKey(5)
-    if key == ord('t'):
+    if key == ord('s'):
+        for i in range(100):
+            fn1 = f'raw_{i:03}.png'
+            if not os.path.exists(fn1):
+                cv2.imwrite(fn1, image0)
+                fn2 = f'all_{i:03}.png'
+                cv2.imwrite(fn2, img_all)
+                print(f'Wrote images {fn1} and {fn2}')
+                break
+    elif key == ord('t'):
         if calc_mm.tare_on:
             calc_mm.tare_lst = []
             calc_mm.tare_on = False
