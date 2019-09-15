@@ -32,6 +32,11 @@
 # 6) Edge detection of the wedge shape arrows before Hough transform is not as
 #    convenient as skipping edge detection, in which case Hough transform is
 #    a thinning operation is more representative of the midline of the pointer.
+# 7) There must be no glare on the dial face. Glare is directly reflected light
+#    and easily saturates the camera sensor and obscures all details. If the
+#    glare obscures the pointer hands, no measurements are possible. Auto
+#    exposure helps as the light intensity changes, but will help with glare
+#    and may be hindered by glare.
 
 import math
 import os
@@ -45,21 +50,21 @@ c_haimer_ball_diam = 4  # millimeters
 
 c_dial_outer_mask_r = 220
 
-c_red_angle_start = 1.8905964141903842
-c_red_angle_end = -1.8765860798694562 + 2 * math.pi
+c_red_angle_start = 1.8946996875705893
+c_red_angle_end = -1.9406482682728394 + 2 * math.pi
 c_initial_image_rot = -.07361130624483032714
 
 c_rho_resolution = 1 / 2  # 1/2 pixel
 c_theta_resolution = np.pi / 180 / 4  # 1/4 degree
 
 c_black_outer_mask_r = 130
-c_black_outer_mask_e = (125, 135)
+c_black_outer_mask_e = (120, 130)
 c_inner_mask_r = 20
 c_red_outer_mask_r = 88
 
 c_black_hough_threshold = 5
-c_black_hough_min_line_length = 22  # needs to be larger than the height of the HAIMER label
-c_black_hough_max_line_gap = 2
+c_black_hough_min_line_length = 42  # needs to be larger than the height of the HAIMER label
+c_black_hough_max_line_gap = 5
 c_black_drawn_line_length = 200
 c_red_hough_threshold = 5
 c_red_hough_min_line_length = 10
@@ -75,7 +80,7 @@ c_label_s = .8
 c_line_color = (0, 200, 0)
 c_line_s = 2
 
-c_center_offset = [12, 5]
+c_center_offset = [25, -3]
 c_image_center = lambda w, h: (w // 2 + c_center_offset[0], h // 2 + c_center_offset[1])
 
 
@@ -165,12 +170,17 @@ def list_camera_properties(video_cap):
 
 
 def set_camera_properties(video_cap):
-    capture_properties = [('cv2.CAP_PROP_FRAME_WIDTH', 1280),
-                          ('cv2.CAP_PROP_FRAME_HEIGHT', 720)
+    # capture_properties = [('cv2.CAP_PROP_FRAME_WIDTH', 1280),
+    #                       ('cv2.CAP_PROP_FRAME_HEIGHT', 720)
+    #                       ]
+
+    capture_properties = [('cv2.CAP_PROP_FRAME_WIDTH', 640),
+                          ('cv2.CAP_PROP_FRAME_HEIGHT', 480)
                           ]
 
     for nm, v in capture_properties:
-        print(nm, video_cap.set(eval(nm), v))
+        if not video_cap.set(eval(nm), v):
+            print('Unable to set', nm, v)
 
 
 # Surprisingly, there is no skeletonization method in OpenCV. It seems common
@@ -539,8 +549,8 @@ def gauge_vision_setup():
         print('camera is not open')
         sys.exit(1)
 
+    set_camera_properties(video_capture)
     # list_camera_properties(video_capture)
-    # set_camera_properties(video_capture)
 
     return video_capture
 
