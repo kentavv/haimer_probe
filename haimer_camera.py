@@ -306,10 +306,32 @@ def black_arrow_segment(image, image_center):
     mask = black_arrow_mask(image, image_center)
     image = cv2.bitwise_and(image, mask)
 
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV_FULL)
-    sat = hsv[:, :, 1] < 80
-    val = hsv[:, :, 2] < 180
-    seg = sat * val * mask[:, :, 0]
+    if False:
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV_FULL)
+        sat = hsv[:, :, 1] < 80
+        val = hsv[:, :, 2] < 180
+        seg = sat * val * mask[:, :, 0]
+    else:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        _, red_arrow_mask = red_arrow_segment(image, image_center)
+
+        m = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
+        red_arrow_mask = cv2.morphologyEx(red_arrow_mask, cv2.MORPH_OPEN, m, iterations=1)
+        red_arrow_mask = cv2.morphologyEx(red_arrow_mask, cv2.MORPH_DILATE, m, iterations=2)
+
+        # rv, thres = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+        # rv, thres = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU + cv2.THRESH_BINARY_INV)
+        # rv, thres = cv2.threshold(gray, 0, 255, cv2.THRESH_TRIANGLE + cv2.THRESH_BINARY_INV)
+        # print('threshold_value', rv)
+
+        # thres = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 7, 5)
+        thres = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 13, 5)
+        thres = thres * 255
+
+        thres = np.clip(thres.astype(np.int16) - red_arrow_mask, 0, 255).astype(np.uint8)
+
+        seg = thres * mask[:, :, 0]
 
     return image, seg
 
