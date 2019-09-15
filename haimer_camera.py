@@ -636,7 +636,7 @@ def main():
     video_capture = gauge_vision_setup()
 
     while True:
-        mm_final = get_measurement(video_capture)
+        mm_final, _ = get_measurement(video_capture)
         # print('mm_final:', mm_final)
 
 
