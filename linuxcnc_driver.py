@@ -112,6 +112,110 @@ def find_ul_corner(video_capture):
     return
 
 
+def find_left_edge(video_capture):
+    success = False
+
+    state = 1
+    d1 = None
+    d2 = None
+
+    c_slow_dwell = 3.
+    c_fast_dwell = .5
+
+    vv_t = None
+
+    while True:
+        s = linuxcnc.stat()
+        s.poll()
+        print(s.axis[0]['input'], s.axis[0]['output'], s.axis[0]['inpos'], s.axis[0]['homed'], s.axis[0]['velocity'], s.axis[0]['enabled'])
+
+        x = s.axis[0]['inpos']
+        y = s.axis[1]['inpos']
+        z = s.axis[2]['inpos']
+        inpos = x == 1 and y == 1 and z == 1
+
+        x = s.axis[0]['input']
+        y = s.axis[1]['input']
+        z = s.axis[2]['input']
+
+        mm_final, _ = haimer_camera.get_measurement(video_capture)
+        if mm_final is None:
+            print('mm_final is None')
+            continue
+
+        if mm_final > 1.0:
+            print('Dangerous overshoot! mm_final=', mm_final)
+            cnc_c.abort()
+            success = False
+            break
+
+        in_final = mm_final / 25.4
+
+        xe = in_final
+        ye = 0
+        ze = 0
+
+        #    print('mm_final:', mm_final, 'in_final:', in_final, 'cur_x:', x, 'tar_x:', tar_x, 'xe:', xe, 'cmd_x:', cmd_x, inpos, ok_for_mdi(s))
+
+        if ok_for_mdi(s) and inpos:
+            #print('state', state, 'total_e:', total_e, 'in_final:', in_final, 'mm_final:', mm_final)
+            print('state', state, 'in_final:', in_final, 'mm_final:', mm_final)
+
+            cmd_x = x
+            cmd_y = y
+            cmd_z = z
+
+            if state == 1:
+                cmd_x = x - xe
+                move_to(cmd_x, cmd_y, cmd_z)
+            elif state == 2:
+                if d1 is None:
+                    d1 = time.time()
+                else:
+                    dt = time.time() - d1
+                    dwell_time = c_fast_dwell if 1.5 < abs(mm_final) else c_slow_dwell
+
+                    if dt < dwell_time:
+                        print('In settling period', dt, '<', dwell_time)
+                    else:
+                        d1 = None
+                        total_e = abs(xe) + abs(ye) + abs(ze)
+                        if dwell_time == c_fast_dwell:
+                            state = 1
+                        elif total_e > .0005:
+                            print('total_e', total_e)
+                            state = 3
+                        else:
+                            state = 4
+                continue
+            elif state == 3:
+                if abs(mm_final) > .05:
+                    cmd_x = x - xe * .95
+                else:
+                    print('part2')
+                    cmd_x = x - xe / 2
+                move_to(cmd_x, cmd_y, cmd_z)
+                state = 2
+            elif state == 4:
+                print('Done, edge found at:', x, y, z, 'with error', total_e)
+                success = True
+                break
+        else:
+            print('Waiting for last move to complete.')
+
+            if state == 1:
+                print('mm_final', mm_final)
+                if abs(mm_final) < 1.5:
+                    print('mm_final0', mm_final)
+                    cnc_c.abort()
+                    state = 2
+                    continue
+
+        sys.stdout.flush()
+
+    return success, x, y, z
+
+
 def find_center_of_hole(video_capture):
     state = 1
     d1 = None
@@ -130,11 +234,10 @@ def find_center_of_hole(video_capture):
         y = s.axis[1]['input']
         z = s.axis[2]['input']
 
-        mm_final = haimer_camera.get_measurement(video_capture)
+        mm_final, _ = haimer_camera.get_measurement(video_capture)
         if mm_final is None:
             print('mm_final is None')
             continue
-        in_final = mm_final / 25.4
 
         if mm_final > 1.0:
             print('Danger!')
@@ -142,11 +245,14 @@ def find_center_of_hole(video_capture):
             state = -1
             continue
 
+        in_final = mm_final / 25.4
+
         # tar_x = -1.20
         # xe = x - tar_x
 
         xe = 0
         ye = 0
+        ze = 0
 
         cmd_x = x
         cmd_y = y
@@ -190,7 +296,7 @@ def find_center_of_hole(video_capture):
             cmd_y = y - ye / 2
             print('state 6', aft_y, forward_y, tar_y, y, ye, cmd_y)
 
-        total_e = abs(xe) + abs(ye)
+        total_e = abs(xe) + abs(ye) + abs(ze)
         #    print('mm_final:', mm_final, 'in_final:', in_final, 'cur_x:', x, 'tar_x:', tar_x, 'xe:', xe, 'cmd_x:', cmd_x, inpos, ok_for_mdi(s))
 
         if ok_for_mdi(s) and inpos:
@@ -258,8 +364,12 @@ def main():
 
     while True:
         mm_final, key = haimer_camera.get_measurement(video_capture)
-        if key == ord('5'):
+        if key == ord('0'):
             find_center_of_hole(video_capture)
+        elif key == ord('6'):
+            cnc_c.mode(linuxcnc.MODE_MDI)
+            cnc_c.wait_complete()
+            find_left_edge(video_capture)
         elif key == ord('7'):
             find_ul_corner(video_capture)
 
