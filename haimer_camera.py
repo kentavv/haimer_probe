@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Copyright 2019 Kent A. Vander Velden <kent.vandervelden@gmail.com>
 #
@@ -71,7 +71,7 @@ c_red_hough_min_line_length = 10
 c_red_hough_max_line_gap = 2
 c_red_drawn_line_length = 140
 
-c_final_image_scale_factor = 1.
+c_final_image_scale_factor = .7
 
 c_label_font = cv2.FONT_HERSHEY_SIMPLEX
 c_label_color = (255, 255, 255)
@@ -291,6 +291,7 @@ def plot_lines(lines, theta, drawn_line_len, image, image_center):
         b = math.sin(theta)
         x0, y0 = image_center
         pt2 = (round(x0 - drawn_line_len * -b), round(y0 - drawn_line_len * a))
+        pt2 = (int(pt2[0]), int(pt2[1]))
         cv2.line(image, image_center, pt2, c_line_color, c_line_s, cv2.LINE_AA)
 
 
@@ -479,9 +480,12 @@ def calc_mm(theta_b, theta_r):
 
 
 def draw_labels(image, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final):
-    cv2.putText(image_b, f'{theta_b:5.2f} rad {mm_b:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image_r, f'{theta_r:5.2f} rad {mm_r:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image, f'{mm_final:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
+    # cv2.putText(image_b, f'{theta_b:5.2f} rad {mm_b:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
+    # cv2.putText(image_r, f'{theta_r:5.2f} rad {mm_r:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
+    # cv2.putText(image, f'{mm_final:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
+    cv2.putText(image_b, '{:5.2f} rad {:6.3f} mm'.format(theta_b, mm_b), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
+    cv2.putText(image_r, '{:5.2f} rad {:6.3f} mm'.format(theta_b, mm_b), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
+    cv2.putText(image, '{:6.3f} mm'.format(mm_final), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
 
 
 @static_vars(fps_lst=[], fps_t1=None)
@@ -495,7 +499,8 @@ def draw_fps(image):
 
     fps = np.mean(draw_fps.fps_lst)
 
-    cv2.putText(image, f'{fps:.2f} fps', (20, 30 * 2), c_label_font, c_label_s, c_label_color)
+    # cv2.putText(image, f'{fps:.2f} fps', (20, 30 * 2), c_label_font, c_label_s, c_label_color)
+    cv2.putText(image, '{:.2f} fps'.format(fps), (20, 30 * 2), c_label_font, c_label_s, c_label_color)
 
 
 @static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False)
@@ -585,12 +590,15 @@ def get_measurement(video_capture):
         get_measurement.pause_updates = not get_measurement.pause_updates
     elif key == ord('s'):
         for i in range(100):
-            fn1 = f'raw_{i:03}.png'
+            # fn1 = f'raw_{i:03}.png'
+            fn1 = 'raw_{:03}.png'.format(i)
             if not os.path.exists(fn1):
                 cv2.imwrite(fn1, image0)
-                fn2 = f'all_{i:03}.png'
+                # fn2 = f'all_{i:03}.png'
+                fn2 = 'all_{:03}.png'.format(i)
                 cv2.imwrite(fn2, img_all)
-                print(f'Wrote images {fn1} and {fn2}')
+                # print(f'Wrote images {fn1} and {fn2}')
+                print('Wrote images {} and {}'.format(fn1, fn2))
                 break
     elif key == ord('t'):
         if calc_mm.tare_on:
