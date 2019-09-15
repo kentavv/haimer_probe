@@ -50,9 +50,9 @@ c_haimer_ball_diam = 4.  # millimeters
 
 c_dial_outer_mask_r = 220
 
-c_red_angle_start = 1.8946996875705893
-c_red_angle_end = -1.9406482682728394 + 2 * math.pi
-c_initial_image_rot = -.07361130624483032714
+c_red_angle_start = 1.9183842044515955
+c_red_angle_end = -1.8894180264975993 + 2 * math.pi
+c_initial_image_rot = -.07275208078176175254 + 0.002881063774711395
 
 c_rho_resolution = 1 / 2.  # 1/2 pixel
 c_theta_resolution = np.pi / 180 / 4.  # 1/4 degree
