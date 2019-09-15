@@ -46,7 +46,7 @@ import time
 import cv2
 import numpy as np
 
-c_haimer_ball_diam = 4  # millimeters
+c_haimer_ball_diam = 4.  # millimeters
 
 c_dial_outer_mask_r = 220
 
@@ -54,8 +54,8 @@ c_red_angle_start = 1.8946996875705893
 c_red_angle_end = -1.9406482682728394 + 2 * math.pi
 c_initial_image_rot = -.07361130624483032714
 
-c_rho_resolution = 1 / 2  # 1/2 pixel
-c_theta_resolution = np.pi / 180 / 4  # 1/4 degree
+c_rho_resolution = 1 / 2.  # 1/2 pixel
+c_theta_resolution = np.pi / 180 / 4.  # 1/4 degree
 
 c_black_outer_mask_r = 130
 c_black_outer_mask_e = (120, 130)
@@ -230,6 +230,45 @@ def filter_lines(lines, image_center, cutoff=5):
 
         lines2 += [[d < cutoff, lst]]
 
+    # Further filter lines by comparing lines against the longest, discarding
+    # lines that are at too great of an angle relative to the longest line.
+    if True:
+        lines3 = []
+
+        # Find the length of the longest line.
+        md = None
+        m_lst = None
+        for lst in lines2:
+            inc, (x1, y1, x2, y2) = lst[0], lst[1][0]
+            if inc:
+                delta_x = x1 - x2
+                delta_y = y1 - y2
+                d = math.sqrt(delta_x**2 + delta_y**2)
+                if md is None or md < d:
+                    md = d
+                    m_lst = lst
+
+        # Filter lines based on angle to longest line.
+        if md is not None:
+            _, (x1, y1, x2, y2) = m_lst[0], m_lst[1][0]
+
+            delta_x = x1 - x2
+            delta_y = y1 - y2
+            a0 = math.atan2(delta_y, delta_x) + math.pi / 2.
+
+            for lst in lines2:
+                inc, (x1, y1, x2, y2) = lst[0], lst[1][0]
+                if inc:
+                    delta_x = x1 - x2
+                    delta_y = y1 - y2
+                    a1 = math.atan2(delta_y, delta_x) + math.pi / 2.
+
+                    mt = difference_of_angles(a0, a1)
+                    inc = inc and abs(mt) < math.pi / 8.
+                    lines3 += [[inc, lst[1]]]
+
+            lines2 = lines3
+
     return lines2
 
 
@@ -271,7 +310,7 @@ def summarize_lines(lines, image_center):
             def h(pt0, pt):
                 delta_x = pt[0] - pt0[0]
                 delta_y = pt[1] - pt0[1]
-                return math.atan2(delta_y, delta_x) + math.pi / 2
+                return math.atan2(delta_y, delta_x) + math.pi / 2.
 
             aa += [h(pt0, pt1), h(pt0, pt2)]
 
@@ -340,9 +379,19 @@ def red_arrow_segment(image, image_center):
     mask = red_arrow_mask(image, image_center)
     image = cv2.bitwise_and(image, mask)
 
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV_FULL)
-    red = (hsv[:, :, 0] < 15) + (hsv[:, :, 0] > 255 - 15)
-    sat = hsv[:, :, 1] > 50
+    if True:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        thres = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 13, 5)
+        thres = thres * 255
+        thres = cv2.bitwise_and(image, image, mask=thres)
+
+        hsv = cv2.cvtColor(thres, cv2.COLOR_BGR2HSV_FULL)
+    else:
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV_FULL)
+
+    red = (hsv[:, :, 0] < 20) + (hsv[:, :, 0] > 255 - 20)
+    sat = hsv[:, :, 1] > 80
     seg = red * sat * mask[:, :, 0]
 
     return image, seg
@@ -402,7 +451,7 @@ def calc_mm(theta_b, theta_r):
     theta_r = max(0., min(math.pi * 2, theta_r))
 
     # Change thetas to millimeters
-    mm_b = theta_b / (math.pi * 2) * 1
+    mm_b = theta_b / (math.pi * 2) * 1.
     mm_r = (theta_r - c_red_angle_start) / (c_red_angle_end - c_red_angle_start) * c_haimer_ball_diam  # - c_haimer_ball_diam / 2
 
     # The decimal portion of mm_r, to be updated.
@@ -423,7 +472,7 @@ def calc_mm(theta_b, theta_r):
     mm_blended = mm_r + mm_offset
 
     # Offset the semifinal measurement by half the probe ball diameter.
-    mm_final = mm_blended - c_haimer_ball_diam / 2
+    mm_final = mm_blended - c_haimer_ball_diam / 2.
 
     # print(f'{mm_r:8.4f} {mm_b:8.4f} {mm_offset:8.4f} {mm_blended:8.4f} {mm_final:8.4f}')
 
