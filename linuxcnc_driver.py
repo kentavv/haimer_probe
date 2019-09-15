@@ -32,24 +32,26 @@
 # http://linuxcnc.org/docs/2.7/html/config/python-interface.html
 
 
-import datetime
+import math
 import sys
 import time
-import math
+
+import linuxcnc
 
 import haimer_camera
-import linuxcnc
 
 cnc_s = None
 cnc_c = None
 
 
 def move_to(x, y, z):
-    #cmd = 'G1 G54 X{0:f} Y{1:f} Z{2:f} f5'.format(x, y, z)
+    # cmd = 'G1 G54 X{0:f} Y{1:f} Z{2:f} f5'.format(x, y, z)
     cmd = 'G1 G53 X{0:f} Y{1:f} Z{2:f} f2'.format(x, y, z)
     print('Command,' + cmd)
 
     cnc_c.mdi(cmd)
+
+
 #    rv = cnc_c.wait_complete(60)
 #    if rv != 1:
 #        print('MDI command timed out')
@@ -102,8 +104,12 @@ def gen_grid(s, e, d):
 # From
 # http://linuxcnc.org/docs/2.7/html/config/python-interface.html
 def ok_for_mdi(s):
-        s.poll()
-        return not s.estop and s.enabled and (s.homed.count(1) == s.axes) and (s.interp_state == linuxcnc.INTERP_IDLE)
+    s.poll()
+    return not s.estop and s.enabled and (s.homed.count(1) == s.axes) and (s.interp_state == linuxcnc.INTERP_IDLE)
+
+
+def find_ul_corner(video_capture):
+    return
 
 
 def find_center_of_hole(video_capture):
@@ -136,8 +142,8 @@ def find_center_of_hole(video_capture):
             state = -1
             continue
 
-        #tar_x = -1.20
-        #xe = x - tar_x
+        # tar_x = -1.20
+        # xe = x - tar_x
 
         xe = 0
         ye = 0
@@ -153,40 +159,40 @@ def find_center_of_hole(video_capture):
             xe = in_final - tar_x
 
             xe *= -1
-            cmd_x = x - xe/2
+            cmd_x = x - xe / 2
         elif state == 2:
             tar_x = 0
             xe = in_final - tar_x
 
-            cmd_x = x - xe/2
+            cmd_x = x - xe / 2
         elif state == 3:
             xe = x - tar_x
             if abs(xe) > .1:
                 xe = math.copysign(.1, xe)
 
-            cmd_x = x - xe/2
+            cmd_x = x - xe / 2
         elif state == 4:
             tar_y = 0
             ye = in_final - tar_y
 
             ye *= -1
-            cmd_y = y - ye/2
+            cmd_y = y - ye / 2
         elif state == 5:
             tar_y = 0
             ye = in_final - tar_y
 
-            cmd_y = y - ye/2
+            cmd_y = y - ye / 2
         elif state == 6:
             ye = y - tar_y
             if abs(ye) > .1:
                 ye = math.copysign(.1, ye)
 
-            cmd_y = y - ye/2
+            cmd_y = y - ye / 2
             print('state 6', aft_y, forward_y, tar_y, y, ye, cmd_y)
 
         total_e = abs(xe) + abs(ye)
-    #    print('mm_final:', mm_final, 'in_final:', in_final, 'cur_x:', x, 'tar_x:', tar_x, 'xe:', xe, 'cmd_x:', cmd_x, inpos, ok_for_mdi(s))
-  
+        #    print('mm_final:', mm_final, 'in_final:', in_final, 'cur_x:', x, 'tar_x:', tar_x, 'xe:', xe, 'cmd_x:', cmd_x, inpos, ok_for_mdi(s))
+
         if ok_for_mdi(s) and inpos:
             if total_e > .0005:
                 if d1 is not None and time.time() - d1 < .5:
@@ -226,9 +232,9 @@ def find_center_of_hole(video_capture):
 
 
 def main():
-#    if len(sys.argv) != 1 + 3 * 3:
-#        print(f'usage: {sys.argv[0]} <xs> <xe> <xd>  <ys> <ye> <yd>  <zs> <ze> <zd>')
-#        sys.exit(1)
+    #    if len(sys.argv) != 1 + 3 * 3:
+    #        print(f'usage: {sys.argv[0]} <xs> <xe> <xd>  <ys> <ye> <yd>  <zs> <ze> <zd>')
+    #        sys.exit(1)
 
     args = map(float, sys.argv[1:])
 
@@ -241,22 +247,28 @@ def main():
     cnc_c.mode(linuxcnc.MODE_MDI)
     cnc_c.wait_complete()
 
-#    s = args[0::3]
-#    e = args[1::3]
-#    d = args[2::3]
+    #    s = args[0::3]
+    #    e = args[1::3]
+    #    d = args[2::3]
 
     video_capture = haimer_camera.gauge_vision_setup()
     # Warm up
     for i in range(30):
-        mm_final = haimer_camera.get_measurement(video_capture)
+        _ = haimer_camera.get_measurement(video_capture)
 
-    find_center_of_hole(video_capture)
+    while True:
+        mm_final, key = haimer_camera.get_measurement(video_capture)
+        if key == ord('5'):
+            find_center_of_hole(video_capture)
+        elif key == ord('7'):
+            find_ul_corner(video_capture)
 
-    #grid_pts = gen_grid(s, e, d)
-    #for pp in grid_pts:
-    #    z, y, x = pp
-    #    move_to(x, y, z)
-    #    time.sleep(.1)  # settling time
+
+# grid_pts = gen_grid(s, e, d)
+# for pp in grid_pts:
+#    z, y, x = pp
+#    move_to(x, y, z)
+#    time.sleep(.1)  # settling time
 #
 #
 #        dt = str(datetime.datetime.now())

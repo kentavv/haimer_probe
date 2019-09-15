@@ -243,7 +243,7 @@ def filter_lines(lines, image_center, cutoff=5):
             if inc:
                 delta_x = x1 - x2
                 delta_y = y1 - y2
-                d = math.sqrt(delta_x**2 + delta_y**2)
+                d = math.sqrt(delta_x ** 2 + delta_y ** 2)
                 if md is None or md < d:
                     md = d
                     m_lst = lst
@@ -273,7 +273,6 @@ def filter_lines(lines, image_center, cutoff=5):
 
 
 def plot_lines(lines, theta, drawn_line_len, image, image_center):
-
     if lines is not None:
         for i in range(len(lines)):
             inc, (x1, y1, x2, y2) = lines[i][0], lines[i][1][0]
@@ -613,10 +612,10 @@ def get_measurement(video_capture):
     elif key == ord('q'):
         sys.exit(1)
     elif key >= 0:
-        pass
         # print(key)
+        pass
 
-    return mm_final
+    return mm_final, key
 
 
 def gauge_vision_setup():
