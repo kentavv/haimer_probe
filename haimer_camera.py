@@ -228,16 +228,17 @@ def filter_lines(lines, image_center, cutoff=5):
         # https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
         d = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1) / math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
 
-        if d < cutoff:
-            lines2 += [lst]
+        lines2 += [[d < cutoff, lst]]
 
     return lines2
 
 
 def plot_lines(lines, theta, drawn_line_len, image, image_center):
+
     if lines is not None:
         for i in range(len(lines)):
-            x1, y1, x2, y2 = lines[i][0]
+            inc, (x1, y1, x2, y2) = lines[i][0], lines[i][1][0]
+
             pt1 = (x1, y1)
             pt2 = (x2, y2)
             pt0 = image_center
@@ -245,7 +246,7 @@ def plot_lines(lines, theta, drawn_line_len, image, image_center):
             cv2.line(image, pt0, pt1, (255, 0, 0), 1, cv2.LINE_AA)
             cv2.line(image, pt0, pt2, (255, 0, 0), 1, cv2.LINE_AA)
 
-            cv2.line(image, pt1, pt2, (0, 0, 255), 3, cv2.LINE_AA)
+            cv2.line(image, pt1, pt2, (0, 0, 255) if inc else (255, 0, 0), 3, cv2.LINE_AA)
 
     if theta is not None:
         a = math.cos(theta)
@@ -257,19 +258,22 @@ def plot_lines(lines, theta, drawn_line_len, image, image_center):
 
 def summarize_lines(lines, image_center):
     aa = []
+
     for lst in lines:
-        x1, y1, x2, y2 = lst[0]
-        pt1 = (x1, y1)
-        pt2 = (x2, y2)
+        inc, (x1, y1, x2, y2) = lst[0], lst[1][0]
 
-        pt0 = image_center
+        if inc:
+            pt1 = (x1, y1)
+            pt2 = (x2, y2)
 
-        def h(pt0, pt):
-            delta_x = pt[0] - pt0[0]
-            delta_y = pt[1] - pt0[1]
-            return math.atan2(delta_y, delta_x) + math.pi / 2
+            pt0 = image_center
 
-        aa += [h(pt0, pt1), h(pt0, pt2)]
+            def h(pt0, pt):
+                delta_x = pt[0] - pt0[0]
+                delta_y = pt[1] - pt0[1]
+                return math.atan2(delta_y, delta_x) + math.pi / 2
+
+            aa += [h(pt0, pt1), h(pt0, pt2)]
 
     theta = None
     if aa:
@@ -424,7 +428,7 @@ def draw_fps(image):
     cv2.putText(image, f'{fps:.2f} fps', (20, 30 * 2), c_label_font, c_label_s, c_label_color)
 
 
-@static_vars(theta_b_l=[], theta_r_l=[])
+@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False)
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
 
@@ -504,9 +508,12 @@ def get_measurement(video_capture):
     img_all = np.hstack([img_all0, img_all1, img_all2])
     img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
-    cv2.imshow("Live", img_all_resized)
+    if not get_measurement.pause_updates:
+        cv2.imshow("Live", img_all_resized)
     key = cv2.waitKey(5)
-    if key == ord('s'):
+    if key == ord('p'):
+        get_measurement.pause_updates = not get_measurement.pause_updates
+    elif key == ord('s'):
         for i in range(100):
             fn1 = f'raw_{i:03}.png'
             if not os.path.exists(fn1):
