@@ -75,9 +75,10 @@ c_label_s = .8
 c_line_color = (0, 200, 0)
 c_line_s = 2
 
+c_center_offset = [12, 5]
 
 def c_image_center(w, h):
-    return (w // 2 + 14, h // 2 - 4)
+    return (w // 2 + c_center_offset[0], h // 2  + c_center_offset[1])
 
 
 # Decorator for static variables, from
@@ -513,8 +514,21 @@ def get_measurement(video_capture):
         else:
             calc_mm.tare_lst = []
             calc_mm.tare_on = True
-    elif key >= 0:
+    elif 81 <= key <= 84:
+        if key == 81: # KEY_LEFT
+            c_center_offset[0] -= 1
+        elif key == 82: # KEY_UP
+            c_center_offset[1] -= 1
+        elif key == 83: # KEY_RIGHT
+            c_center_offset[0] += 1
+        elif key == 84: # KEY_DOWN
+            c_center_offset[1] += 1
+        print('c_center_offset:', c_center_offset)
+    elif key == ord('q'):
         sys.exit(1)
+    elif key >= 0:
+        pass
+        #print(key)
 
     return mm_final
 
