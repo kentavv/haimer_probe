@@ -302,24 +302,52 @@ def find_edge(video_capture, direction):
     return (x, y, z), (x - start_x, y - start_y, z - start_z)
 
 
+def touch_off(axis, v):
+    if axis == 'x':
+        cmd = 'G10 L2 P1 X{}'.format(v)
+    elif axis == 'y':
+        cmd = 'G10 L2 P1 Y{}'.format(v)
+    elif axis == 'z':
+        cmd = 'G10 L2 P1 Z[{} - #5403]'.format(v)
+    else:
+        cmd = None
+
+    if cmd is not None:
+        cnc_c.mdi(cmd)
+        rv = cnc_c.wait_complete(60)
+        print('touch off cmd', cmd, rv)
+    else:
+        print('unable to touch off')
+
+
 def find_left_edge(video_capture):
-    return find_edge(video_capture, [1, 0, 0])
+    lst, dlst = find_edge(video_capture, [1, 0, 0])
+    touch_off('x', lst[0])
+    return lst, dlst
 
 
 def find_right_edge(video_capture):
-    return find_edge(video_capture, [-1, 0, 0])
+    lst, dlst = find_edge(video_capture, [-1, 0, 0])
+    touch_off('x', lst[0])
+    return lst, dlst
 
 
 def find_aft_edge(video_capture):
-    return find_edge(video_capture, [0, -1, 0])
+    lst, dlst = find_edge(video_capture, [0, -1, 0])
+    touch_off('y', lst[1])
+    return lst, dlst
 
 
 def find_forward_edge(video_capture):
-    return find_edge(video_capture, [0, 1, 0])
+    lst, dlst = find_edge(video_capture, [0, 1, 0])
+    touch_off('y', lst[1])
+    return lst, dlst
 
 
 def find_top_edge(video_capture):
-    return find_edge(video_capture, [0, 0, -1])
+    lst, dlst = find_edge(video_capture, [0, 0, -1])
+    touch_off('z', lst[2])
+    return lst, dlst
 
 
 def find_center_of_hole(video_capture):
@@ -335,22 +363,22 @@ def find_center_of_hole(video_capture):
     start_y = s.axis[1]['input']
     start_z = s.axis[2]['input']
 
-    left = find_left_edge(video_capture)
+    left, _ = find_left_edge(video_capture)
     _, _ = monitored_move_to(video_capture, start_x, start_y, start_z)
 
-    right = find_right_edge(video_capture)
+    right, _ = find_right_edge(video_capture)
 
-    dx = right[0][0] - left[0][0]
-    cmd_x = left[0][0] + dx / 2.
+    dx = right[0] - left[0]
+    cmd_x = left[0] + dx / 2.
     _, _ = monitored_move_to(video_capture, cmd_x, start_y, start_z)
 
-    aft = find_aft_edge(video_capture)
+    aft, _ = find_aft_edge(video_capture)
     _, _ = monitored_move_to(video_capture, cmd_x, start_y, start_z)
 
-    forward = find_forward_edge(video_capture)
+    forward, _ = find_forward_edge(video_capture)
 
-    dy = forward[0][1] - aft[0][1]
-    cmd_y = aft[0][1] + dy / 2.
+    dy = forward[1] - aft[1]
+    cmd_y = aft[1] + dy / 2.
     _, _ = monitored_move_to(video_capture, cmd_x, cmd_y, start_z)
 
     dz = 0
@@ -368,6 +396,9 @@ def find_center_of_hole(video_capture):
     z = s.axis[2]['input']
 
     print('Centered in circle at', x, y, z)
+
+    touch_off('x', x)
+    touch_off('y', y)
 
     return (x, y, z), (x - start_x, y - start_y, z - start_z)
 
