@@ -114,10 +114,6 @@ def is_moving(s):
     return any([abs(s.axis[x]['velocity']) > 0. for x in range(3)])
 
 
-def find_ul_corner(video_capture):
-    return
-
-
 def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z):
     cnc_c.mode(linuxcnc.MODE_MDI)
     cnc_c.wait_complete()
@@ -348,6 +344,76 @@ def find_top_edge(video_capture):
     return lst, dlst
 
 
+def find_corner(video_capture, direction):
+    s = linuxcnc.stat()
+    s.poll()
+
+    moving = is_moving(s)
+
+    start_x = s.axis[0]['input']
+    start_y = s.axis[1]['input']
+    start_z = s.axis[2]['input']
+
+    ball_diam = 4. / 25.4
+
+    if direction == 'ul':
+        edge_x, _ = find_left_edge(video_capture)
+        _, _ = monitored_move_to(video_capture, edge_x[0] - ball_diam, start_y, start_z)
+        _, _ = monitored_move_to(video_capture, edge_x[0] - ball_diam, start_y + 0.5, start_z)
+        _, _ = monitored_move_to(video_capture, edge_x[0] + ball_diam, start_y + 0.5, start_z)
+        edge_y, _ = find_aft_edge(video_capture)
+    elif direction == 'ur':
+        edge_x, _ = find_right_edge(video_capture)
+        _, _ = monitored_move_to(video_capture, edge_x[0] + ball_diam, start_y, start_z)
+        _, _ = monitored_move_to(video_capture, edge_x[0] + ball_diam, start_y + 0.5, start_z)
+        _, _ = monitored_move_to(video_capture, edge_x[0] - ball_diam, start_y + 0.5, start_z)
+        edge_y, _ = find_aft_edge(video_capture)
+    elif direction == 'll':
+        edge_x, _ = find_left_edge(video_capture)
+        _, _ = monitored_move_to(video_capture, edge_x[0] - ball_diam, start_y, start_z)
+        _, _ = monitored_move_to(video_capture, edge_x[0] - ball_diam, start_y - 0.5, start_z)
+        _, _ = monitored_move_to(video_capture, edge_x[0] + ball_diam, start_y - 0.5, start_z)
+        edge_y, _ = find_forward_edge(video_capture)
+    elif direction == 'lr':
+        edge_x, _ = find_right_edge(video_capture)
+        _, _ = monitored_move_to(video_capture, edge_x[0] + ball_diam, start_y, start_z)
+        _, _ = monitored_move_to(video_capture, edge_x[0] + ball_diam, start_y - 0.5, start_z)
+        _, _ = monitored_move_to(video_capture, edge_x[0] - ball_diam, start_y - 0.5, start_z)
+        edge_y, _ = find_forward_edge(video_capture)
+
+    s.poll()
+
+    moving = is_moving(s)
+    print('moving:', moving)
+
+    x = edge_x[0]
+    y = edge_y[1]
+    z = s.axis[2]['input']
+
+    print('Touch off at', x, y)
+
+    touch_off('x', x)
+    touch_off('y', y)
+
+    return (x, y, z), (x - start_x, y - start_y, z - start_z)
+
+
+def find_ul_corner(video_capture):
+    return find_corner(video_capture, 'ul')
+
+
+def find_ur_corner(video_capture):
+    return find_corner(video_capture, 'ur')
+
+
+def find_ll_corner(video_capture):
+    return find_corner(video_capture, 'll')
+
+
+def find_lr_corner(video_capture):
+    return find_corner(video_capture, 'lr')
+
+
 def find_center_of_hole(video_capture):
     s = linuxcnc.stat()
     s.poll()
@@ -387,7 +453,7 @@ def find_center_of_hole(video_capture):
     y = s.axis[1]['input']
     z = s.axis[2]['input']
 
-    print('Centered in circle at', x, y, z)
+    print('Centered in circle at', x, y)
 
     touch_off('x', x)
     touch_off('y', y)
@@ -421,12 +487,17 @@ def main():
             ord('6'): find_left_edge,
             ord('8'): find_forward_edge,
             ord('2'): find_aft_edge,
-            ord('5'): find_top_edge}
+            ord('5'): find_top_edge,
+            ord('1'): find_ur_corner,
+            ord('3'): find_ul_corner,
+            ord('7'): find_lr_corner,
+            ord('9'): find_ll_corner
+            }
 
     try:
         # Warm up
-        for i in range(30):
-            _ = haimer_camera.get_measurement(video_capture)
+        # for i in range(30):
+        #     _ = haimer_camera.get_measurement(video_capture)
 
         while True:
             mm_final, key = haimer_camera.get_measurement(video_capture)
