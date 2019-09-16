@@ -110,6 +110,10 @@ def ok_for_mdi(s):
     return not s.estop and s.enabled and (s.homed.count(1) == s.axes) and (s.interp_state == linuxcnc.INTERP_IDLE)
 
 
+def is_moving(s):
+    return any([abs(s.axis[x]['velocity']) > 0. for x in range(3)])
+
+
 def find_ul_corner(video_capture):
     return
 
@@ -133,10 +137,7 @@ def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z):
         s.poll()
         print(s.axis[0]['input'], s.axis[0]['output'], s.axis[0]['homed'], s.axis[0]['velocity'], s.axis[0]['enabled'])
 
-        x = abs(s.axis[0]['velocity']) > 0.
-        y = abs(s.axis[1]['velocity']) > 0.
-        z = abs(s.axis[2]['velocity']) > 0.
-        moving = x or y or z
+        moving = is_moving(s)
 
         x = s.axis[0]['input']
         y = s.axis[1]['input']
@@ -202,10 +203,7 @@ def find_edge(video_capture, direction):
         s.poll()
         print(s.axis[0]['input'], s.axis[0]['output'], s.axis[0]['homed'], s.axis[0]['velocity'], s.axis[0]['enabled'])
 
-        x = abs(s.axis[0]['velocity']) > 0.
-        y = abs(s.axis[1]['velocity']) > 0.
-        z = abs(s.axis[2]['velocity']) > 0.
-        moving = x or y or z
+        moving = is_moving(s)
 
         x = s.axis[0]['input']
         y = s.axis[1]['input']
@@ -354,10 +352,7 @@ def find_center_of_hole(video_capture):
     s = linuxcnc.stat()
     s.poll()
 
-    x = abs(s.axis[0]['velocity']) > 0.
-    y = abs(s.axis[1]['velocity']) > 0.
-    z = abs(s.axis[2]['velocity']) > 0.
-    moving = x or y or z
+    moving = is_moving(s)
 
     start_x = s.axis[0]['input']
     start_y = s.axis[1]['input']
@@ -385,10 +380,7 @@ def find_center_of_hole(video_capture):
 
     s.poll()
 
-    x = abs(s.axis[0]['velocity']) > 0.
-    y = abs(s.axis[1]['velocity']) > 0.
-    z = abs(s.axis[2]['velocity']) > 0.
-    moving = x or y or z
+    moving = is_moving(s)
     print('moving:', moving)
 
     x = s.axis[0]['input']
@@ -447,10 +439,7 @@ def main():
         s = linuxcnc.stat()
         s.poll()
 
-        x = abs(s.axis[0]['velocity']) > 0.
-        y = abs(s.axis[1]['velocity']) > 0.
-        z = abs(s.axis[2]['velocity']) > 0.
-        moving = x or y or z
+        moving = is_moving(s)
 
         cnc_c.abort()
         print('Quit requested', moving)
