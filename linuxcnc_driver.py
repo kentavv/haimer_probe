@@ -40,17 +40,19 @@ import linuxcnc
 
 import haimer_camera
 
+c_slow_dwell = 2.
+c_fast_dwell = .5
+
 cnc_s = None
 cnc_c = None
 
 
 def move_to(x, y, z):
     # cmd = 'G1 G54 X{0:f} Y{1:f} Z{2:f} f5'.format(x, y, z)
-    cmd = 'G1 G53 X{0:f} Y{1:f} Z{2:f} f2'.format(x, y, z)
+    cmd = 'G1 G53 X{0:f} Y{1:f} Z{2:f} f5'.format(x, y, z)
     print('Command,' + cmd)
 
     cnc_c.mdi(cmd)
-
 
 #    rv = cnc_c.wait_complete(60)
 #    if rv != 1:
@@ -112,27 +114,29 @@ def find_ul_corner(video_capture):
     return
 
 
-def find_left_edge(video_capture):
-    success = False
+def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z):
+    cnc_c.mode(linuxcnc.MODE_MDI)
+    cnc_c.wait_complete()
 
-    state = 1
+    state = 0
     d1 = None
     d2 = None
 
-    c_slow_dwell = 3.
-    c_fast_dwell = .5
-
     vv_t = None
+
+    start_x = None
+    start_y = None
+    start_z = None
 
     while True:
         s = linuxcnc.stat()
         s.poll()
-        print(s.axis[0]['input'], s.axis[0]['output'], s.axis[0]['inpos'], s.axis[0]['homed'], s.axis[0]['velocity'], s.axis[0]['enabled'])
+        print(s.axis[0]['input'], s.axis[0]['output'], s.axis[0]['homed'], s.axis[0]['velocity'], s.axis[0]['enabled'])
 
-        x = s.axis[0]['inpos']
-        y = s.axis[1]['inpos']
-        z = s.axis[2]['inpos']
-        inpos = x == 1 and y == 1 and z == 1
+        x = abs(s.axis[0]['velocity']) > 0.
+        y = abs(s.axis[1]['velocity']) > 0.
+        z = abs(s.axis[2]['velocity']) > 0.
+        moving = x or y or z
 
         x = s.axis[0]['input']
         y = s.axis[1]['input']
@@ -144,20 +148,91 @@ def find_left_edge(video_capture):
             continue
 
         if mm_final > 1.0:
-            print('Dangerous overshoot! mm_final=', mm_final)
+            s = 'Dangerous overshoot! mm_final={}'.format(mm_final)
+            print(s)
             cnc_c.abort()
-            success = False
-            break
+            raise Exception(s)
+
+        if ok_for_mdi(s) and not moving:
+            print('state', state, 'mm_final:', mm_final)
+
+            if state == 0:
+                start_x = x
+                start_y = y
+                start_z = z
+                state = 1
+                continue
+            elif state == 1:
+                move_to(cmd_x, cmd_y, cmd_z)
+            elif state == 2:
+                dx = x - cmd_x
+                dy = y - cmd_y
+                dz = z - cmd_z
+                total_e = abs(dx) + abs(dy) + abs(dz)
+                print('Done, move to', x, y, z, 'completed with error', total_e)
+                break
+        else:
+            print('Waiting for move to complete.')
+
+            if state == 1:
+                print('mm_final', mm_final)
+                state = 2
+
+        sys.stdout.flush()
+
+    return (x, y, z), (x - start_x, y - start_y, z - start_z)
+
+
+def find_edge(video_capture, direction):
+    cnc_c.mode(linuxcnc.MODE_MDI)
+    cnc_c.wait_complete()
+
+    state = 0
+    d1 = None
+    d2 = None
+
+    vv_t = None
+
+    start_x = None
+    start_y = None
+    start_z = None
+
+    while True:
+        s = linuxcnc.stat()
+        s.poll()
+        print(s.axis[0]['input'], s.axis[0]['output'], s.axis[0]['homed'], s.axis[0]['velocity'], s.axis[0]['enabled'])
+
+        x = abs(s.axis[0]['velocity']) > 0.
+        y = abs(s.axis[1]['velocity']) > 0.
+        z = abs(s.axis[2]['velocity']) > 0.
+        moving = x or y or z
+
+        x = s.axis[0]['input']
+        y = s.axis[1]['input']
+        z = s.axis[2]['input']
+
+        print(s.axis[0])
+
+        mm_final, _ = haimer_camera.get_measurement(video_capture)
+        if mm_final is None:
+            print('mm_final is None')
+            continue
+
+        if mm_final > 1.0:
+            s = 'Dangerous overshoot! mm_final={}'.format(mm_final)
+            print(s)
+            cnc_c.abort()
+            raise Exception(s)
 
         in_final = mm_final / 25.4
 
-        xe = in_final
-        ye = 0
-        ze = 0
+        xe = in_final * direction[0]
+        ye = in_final * direction[1]
+        ze = in_final * direction[2]
 
-        #    print('mm_final:', mm_final, 'in_final:', in_final, 'cur_x:', x, 'tar_x:', tar_x, 'xe:', xe, 'cmd_x:', cmd_x, inpos, ok_for_mdi(s))
+        #    print('mm_final:', mm_final, 'in_final:', in_final, 'cur_x:', x, 'tar_x:', tar_x, 'xe:', xe, 'cmd_x:', cmd_x, ok_for_mdi(s))
 
-        if ok_for_mdi(s) and inpos:
+        if ok_for_mdi(s) and not moving:
             #print('state', state, 'total_e:', total_e, 'in_final:', in_final, 'mm_final:', mm_final)
             print('state', state, 'in_final:', in_final, 'mm_final:', mm_final)
 
@@ -165,8 +240,16 @@ def find_left_edge(video_capture):
             cmd_y = y
             cmd_z = z
 
-            if state == 1:
+            if state == 0:
+                start_x = x
+                start_y = y
+                start_z = z
+                state = 1
+                continue
+            elif state == 1:
                 cmd_x = x - xe
+                cmd_y = y - ye
+                cmd_z = z - ze
                 move_to(cmd_x, cmd_y, cmd_z)
             elif state == 2:
                 if d1 is None:
@@ -191,17 +274,20 @@ def find_left_edge(video_capture):
             elif state == 3:
                 if abs(mm_final) > .05:
                     cmd_x = x - xe * .95
+                    cmd_y = y - ye * .95
+                    cmd_z = z - ze * .95
                 else:
                     print('part2')
                     cmd_x = x - xe / 2
+                    cmd_y = y - ye / 2
+                    cmd_z = z - ze / 2
                 move_to(cmd_x, cmd_y, cmd_z)
                 state = 2
             elif state == 4:
                 print('Done, edge found at:', x, y, z, 'with error', total_e)
-                success = True
                 break
         else:
-            print('Waiting for last move to complete.')
+            print('Waiting for move to complete.')
 
             if state == 1:
                 print('mm_final', mm_final)
@@ -213,128 +299,77 @@ def find_left_edge(video_capture):
 
         sys.stdout.flush()
 
-    return success, x, y, z
+    return (x, y, z), (x - start_x, y - start_y, z - start_z)
+
+
+def find_left_edge(video_capture):
+    return find_edge(video_capture, [1, 0, 0])
+
+
+def find_right_edge(video_capture):
+    return find_edge(video_capture, [-1, 0, 0])
+
+
+def find_aft_edge(video_capture):
+    return find_edge(video_capture, [0, -1, 0])
+
+
+def find_forward_edge(video_capture):
+    return find_edge(video_capture, [0, 1, 0])
+
+
+def find_top_edge(video_capture):
+    return find_edge(video_capture, [0, 0, -1])
 
 
 def find_center_of_hole(video_capture):
-    state = 1
-    d1 = None
+    s = linuxcnc.stat()
+    s.poll()
 
-    while True:
-        s = linuxcnc.stat()
-        s.poll()
-        print(s.axis[0]['input'], s.axis[0]['output'], s.axis[0]['inpos'], s.axis[0]['homed'], s.axis[0]['velocity'], s.axis[0]['enabled'])
+    x = abs(s.axis[0]['velocity']) > 0.
+    y = abs(s.axis[1]['velocity']) > 0.
+    z = abs(s.axis[2]['velocity']) > 0.
+    moving = x or y or z
 
-        x = s.axis[0]['inpos']
-        y = s.axis[1]['inpos']
-        z = s.axis[2]['inpos']
-        inpos = x == 1 and y == 1 and z == 1
+    start_x = s.axis[0]['input']
+    start_y = s.axis[1]['input']
+    start_z = s.axis[2]['input']
 
-        x = s.axis[0]['input']
-        y = s.axis[1]['input']
-        z = s.axis[2]['input']
+    left = find_left_edge(video_capture)
+    _, _ = monitored_move_to(video_capture, start_x, start_y, start_z)
 
-        mm_final, _ = haimer_camera.get_measurement(video_capture)
-        if mm_final is None:
-            print('mm_final is None')
-            continue
+    right = find_right_edge(video_capture)
 
-        if mm_final > 1.0:
-            print('Danger!')
-            cnc_c.abort()
-            state = -1
-            continue
+    dx = right[0][0] - left[0][0]
+    cmd_x = left[0][0] + dx / 2.
+    _, _ = monitored_move_to(video_capture, cmd_x, start_y, start_z)
 
-        in_final = mm_final / 25.4
+    aft = find_aft_edge(video_capture)
+    _, _ = monitored_move_to(video_capture, cmd_x, start_y, start_z)
 
-        # tar_x = -1.20
-        # xe = x - tar_x
+    forward = find_forward_edge(video_capture)
 
-        xe = 0
-        ye = 0
-        ze = 0
+    dy = forward[0][1] - aft[0][1]
+    cmd_y = aft[0][1] + dy / 2.
+    _, _ = monitored_move_to(video_capture, cmd_x, cmd_y, start_z)
 
-        cmd_x = x
-        cmd_y = y
-        cmd_z = z
+    dz = 0
 
-        if state == -1:
-            continue
-        if state == 1:
-            tar_x = 0
-            xe = in_final - tar_x
+    s.poll()
 
-            xe *= -1
-            cmd_x = x - xe / 2
-        elif state == 2:
-            tar_x = 0
-            xe = in_final - tar_x
+    x = abs(s.axis[0]['velocity']) > 0.
+    y = abs(s.axis[1]['velocity']) > 0.
+    z = abs(s.axis[2]['velocity']) > 0.
+    moving = x or y or z
+    print('moving:', moving)
 
-            cmd_x = x - xe / 2
-        elif state == 3:
-            xe = x - tar_x
-            if abs(xe) > .1:
-                xe = math.copysign(.1, xe)
+    x = s.axis[0]['input']
+    y = s.axis[1]['input']
+    z = s.axis[2]['input']
 
-            cmd_x = x - xe / 2
-        elif state == 4:
-            tar_y = 0
-            ye = in_final - tar_y
+    print('Centered in circle at', x, y, z)
 
-            ye *= -1
-            cmd_y = y - ye / 2
-        elif state == 5:
-            tar_y = 0
-            ye = in_final - tar_y
-
-            cmd_y = y - ye / 2
-        elif state == 6:
-            ye = y - tar_y
-            if abs(ye) > .1:
-                ye = math.copysign(.1, ye)
-
-            cmd_y = y - ye / 2
-            print('state 6', aft_y, forward_y, tar_y, y, ye, cmd_y)
-
-        total_e = abs(xe) + abs(ye) + abs(ze)
-        #    print('mm_final:', mm_final, 'in_final:', in_final, 'cur_x:', x, 'tar_x:', tar_x, 'xe:', xe, 'cmd_x:', cmd_x, inpos, ok_for_mdi(s))
-
-        if ok_for_mdi(s) and inpos:
-            if total_e > .0005:
-                if d1 is not None and time.time() - d1 < .5:
-                    print('In settling period')
-                    continue
-                move_to(cmd_x, cmd_y, cmd_z)
-                d1 = time.time()
-            else:
-                print('No move is needed')
-                if state == 1:
-                    left_x = x
-                    cmd_x += .1
-                    move_to(cmd_x, y, z)
-                    state = 2
-                elif state == 2:
-                    right_x = x
-                    tar_x = left_x + (right_x - left_x) / 2.
-                    state = 3
-                elif state == 3:
-                    state = 4
-                elif state == 4:
-                    aft_y = y
-                    cmd_y += .1
-                    move_to(x, cmd_y, z)
-                    state = 5
-                elif state == 5:
-                    forward_y = y
-                    tar_y = forward_y + (aft_y - forward_y) / 2.
-                    state = 6
-                elif state == 6:
-                    print('Done, center found at:', cmd_x, cmd_y, cmd_z)
-                    break
-        else:
-            print('Waiting for last move to complete.')
-
-        sys.stdout.flush()
+    return (x, y, z), (x - start_x, y - start_y, z - start_z)
 
 
 def main():
@@ -350,28 +385,47 @@ def main():
     cnc_s = linuxcnc.stat()
     cnc_c = linuxcnc.command()
 
-    cnc_c.mode(linuxcnc.MODE_MDI)
-    cnc_c.wait_complete()
+    #cnc_c.mode(linuxcnc.MODE_MDI)
+    #cnc_c.wait_complete()
 
     #    s = args[0::3]
     #    e = args[1::3]
     #    d = args[2::3]
 
     video_capture = haimer_camera.gauge_vision_setup()
-    # Warm up
-    for i in range(30):
-        _ = haimer_camera.get_measurement(video_capture)
+    cmds = {ord('0'): find_center_of_hole,
+            ord('4'): find_right_edge,
+            ord('6'): find_left_edge,
+            ord('8'): find_forward_edge,
+            ord('2'): find_aft_edge,
+            ord('5'): find_top_edge}
 
-    while True:
-        mm_final, key = haimer_camera.get_measurement(video_capture)
-        if key == ord('0'):
-            find_center_of_hole(video_capture)
-        elif key == ord('6'):
-            cnc_c.mode(linuxcnc.MODE_MDI)
-            cnc_c.wait_complete()
-            find_left_edge(video_capture)
-        elif key == ord('7'):
-            find_ul_corner(video_capture)
+    try:
+        # Warm up
+        for i in range(30):
+            _ = haimer_camera.get_measurement(video_capture)
+
+        while True:
+            mm_final, key = haimer_camera.get_measurement(video_capture)
+            try:
+                res = cmds[key](video_capture)
+                print(res)
+            except KeyError:
+                pass
+    except haimer_camera.QuitException:
+        s = linuxcnc.stat()
+        s.poll()
+
+        x = abs(s.axis[0]['velocity']) > 0.
+        y = abs(s.axis[1]['velocity']) > 0.
+        z = abs(s.axis[2]['velocity']) > 0.
+        moving = x or y or z
+
+        cnc_c.abort()
+        print('Quit requested', moving)
+
+        if moving:
+            sys.exit(1)
 
 
 # grid_pts = gen_grid(s, e, d)
