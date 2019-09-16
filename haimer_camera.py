@@ -84,6 +84,10 @@ c_center_offset = [25, -3]
 c_image_center = lambda w, h: (w // 2 + c_center_offset[0], h // 2 + c_center_offset[1])
 
 
+class QuitException(Exception):
+    pass
+
+
 # Decorator for static variables, from
 # https://stackoverflow.com/questions/279561/what-is-the-python-equivalent-of-static-variables-inside-a-function
 def static_vars(**kwargs):
@@ -618,7 +622,7 @@ def get_measurement(video_capture):
             c_center_offset[1] += 1
         print('c_center_offset:', c_center_offset)
     elif key == ord('q'):
-        sys.exit(1)
+        raise QuitException
     elif key >= 0:
         # print(key)
         pass
@@ -644,8 +648,11 @@ def main():
     video_capture = gauge_vision_setup()
 
     while True:
-        mm_final, _ = get_measurement(video_capture)
-        # print('mm_final:', mm_final)
+        try:
+            mm_final, key = get_measurement(video_capture)
+            # print('mm_final:', mm_final)
+        except QuitException:
+            break
 
 
 if __name__ == "__main__":
