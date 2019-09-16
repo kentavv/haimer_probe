@@ -38,6 +38,8 @@
 #    the probe diameter.
 # 2) The find_edge(...) may be able to be simplified using monitored_move_to(...)
 # 3) The probe3d(...) method is meant as a starting point and has not been tested.
+# 4) External cylindrical boss center finding would be useful. Likely to be
+#    very different than find_center_of_hole(...)
 
 
 import math
