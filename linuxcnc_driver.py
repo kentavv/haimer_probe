@@ -31,6 +31,14 @@
 # Documentation for external libraries
 # http://linuxcnc.org/docs/2.7/html/config/python-interface.html
 
+# Ideas and observations:
+# 1) Instead of blindly moving the probe by a fixed amount when moving
+#    from the first to the second edge, the probe could be dragged 
+#    along the first edge until past the second edge by half
+#    the probe diameter.
+# 2) The find_edge(...) may be able to be simplified using monitored_move_to(...)
+# 3) The probe3d(...) method is meant as a starting point and has not been tested.
+
 
 import math
 import sys
@@ -461,25 +469,47 @@ def find_center_of_hole(video_capture):
     return (x, y, z), (x - start_x, y - start_y, z - start_z)
 
 
+def probe3d(video_capture):
+    s = [0., 0., 1.]
+    e = [1., 1., 1.]
+    d = [.1, .1, 1.]
+
+    final_pts = []
+
+    grid_pts = gen_grid(s, e, d)
+    for pp in grid_pts:
+        z, y, x = pp
+
+        cmd_x = x
+        cmd_y = y
+        cmd_z = z
+        monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z)
+
+        lst, dlst = find_edge(video_capture, [0, 0, -1])
+        final_z = lst[2]
+
+        monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z)
+
+        final_pts += [[x, y, final_z]]
+        print(x, y, final_z)
+        sys.stdout.flush()
+
+    return final_pts
+
+
 def main():
-    #    if len(sys.argv) != 1 + 3 * 3:
-    #        print(f'usage: {sys.argv[0]} <xs> <xe> <xd>  <ys> <ye> <yd>  <zs> <ze> <zd>')
-    #        sys.exit(1)
+    # if len(sys.argv) != 1 + 3 * 3:
+    #     print(f'usage: {sys.argv[0]} <xs> <xe> <xd>  <ys> <ye> <yd>  <zs> <ze> <zd>')
+    #     sys.exit(1)
+    #
+    # args = map(float, sys.argv[1:])
 
-    args = map(float, sys.argv[1:])
-
+    probe3d(None)
     global cnc_s
     global cnc_c
 
     cnc_s = linuxcnc.stat()
     cnc_c = linuxcnc.command()
-
-    #cnc_c.mode(linuxcnc.MODE_MDI)
-    #cnc_c.wait_complete()
-
-    #    s = args[0::3]
-    #    e = args[1::3]
-    #    d = args[2::3]
 
     video_capture = haimer_camera.gauge_vision_setup()
     cmds = {ord('0'): find_center_of_hole,
@@ -518,18 +548,6 @@ def main():
         if moving:
             sys.exit(1)
 
-
-# grid_pts = gen_grid(s, e, d)
-# for pp in grid_pts:
-#    z, y, x = pp
-#    move_to(x, y, z)
-#    time.sleep(.1)  # settling time
-#
-#
-#        dt = str(datetime.datetime.now())
-#        #print('Result,' + ','.join(map(str, [dt, x, y, z, mm_final])), flush=True)
-#        print('Result,' + ','.join(map(str, [dt, x, y, z, mm_final])))
-#        sys.stdout.flush()
 
 
 if __name__ == "__main__":
