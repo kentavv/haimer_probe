@@ -507,7 +507,7 @@ def draw_fps(image):
     cv2.putText(image, '{:.2f} fps'.format(fps), (20, 30 * 2), c_label_font, c_label_s, c_label_color)
 
 
-@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False)
+@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, record=False, record_ind=0)
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
 
@@ -587,11 +587,20 @@ def get_measurement(video_capture):
     img_all = np.hstack([img_all0, img_all1, img_all2])
     img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
+    if record:
+        fn1 = 'mov_raw_{:06}.png'.format(record_ind)
+        cv2.imwrite(fn1, image0)
+        fn2 = 'mov_all_{:06}.png'.format(record_ind)
+        cv2.imwrite(fn2, img_all)
+        record_ind += 1
+
     if not get_measurement.pause_updates:
         cv2.imshow("Live", img_all_resized)
     key = cv2.waitKey(5)
     if key == ord('p'):
         get_measurement.pause_updates = not get_measurement.pause_updates
+    elif key == ord('r'):
+        record = not record
     elif key == ord('s'):
         for i in range(100):
             # fn1 = f'raw_{i:03}.png'
