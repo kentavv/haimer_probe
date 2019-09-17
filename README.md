@@ -16,8 +16,11 @@ A Microsoft LifeCam Cinema webcam is attached to a Haimer 3D Taser with a 3d pri
 * KEY_RIGHT: move pivot point to the right
 * KEY_DOWN: move pivot point down
 
-## Keyboard commands (linuxcnc_driver.py, in addition to the haimer_camera.py commands)
-These commands are best seen on a numeric keypad. The direction shown on the keypad indicates the direction the probe approaches the part.
+## Keyboard commands (linuxcnc_driver.py)
+These commands are in addition to those inherited from haimer_camera.py.
+
+The additional commands are best seen on a numeric keypad. The direction shown on the keypad indicates the direction the probe approaches the part.
+
 * 0: find center of hole, internal edges
 * 4: find edge moving to the left, -x
 * 6: find edge moving to the right, +x
