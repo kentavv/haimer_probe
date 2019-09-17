@@ -587,12 +587,13 @@ def get_measurement(video_capture):
     img_all = np.hstack([img_all0, img_all1, img_all2])
     img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
-    if record:
-        fn1 = 'mov_raw_{:06}.png'.format(record_ind)
+    if get_measurement.record:
+        fn1 = 'mov_raw_{:06}.ppm'.format(get_measurement.record_ind)
         cv2.imwrite(fn1, image0)
-        fn2 = 'mov_all_{:06}.png'.format(record_ind)
+        fn2 = 'mov_all_{:06}.ppm'.format(get_measurement.record_ind)
         cv2.imwrite(fn2, img_all)
-        record_ind += 1
+        get_measurement.record_ind += 1
+        print('Recorded {} {}'.format(fn1, fn2))
 
     if not get_measurement.pause_updates:
         cv2.imshow("Live", img_all_resized)
@@ -600,7 +601,7 @@ def get_measurement(video_capture):
     if key == ord('p'):
         get_measurement.pause_updates = not get_measurement.pause_updates
     elif key == ord('r'):
-        record = not record
+        get_measurement.record = not get_measurement.record
     elif key == ord('s'):
         for i in range(100):
             # fn1 = f'raw_{i:03}.png'
