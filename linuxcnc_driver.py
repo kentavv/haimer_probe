@@ -57,6 +57,15 @@ cnc_s = None
 cnc_c = None
 
 
+class OvershootException(Exception):
+    def __init__(self, mm_final):
+        self.mm_final = mm_final
+
+    def __str__(self):
+        s = 'Dangerous overshoot! mm_final={}'.format(self.mm_final)
+        return s
+
+
 def move_to(x, y, z):
     # cmd = 'G1 G54 X{0:f} Y{1:f} Z{2:f} f5'.format(x, y, z)
     cmd = 'G1 G53 X{0:f} Y{1:f} Z{2:f} f5'.format(x, y, z)
@@ -155,10 +164,8 @@ def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z):
             continue
 
         if mm_final > 1.0:
-            s = 'Dangerous overshoot! mm_final={}'.format(mm_final)
-            print(s)
             cnc_c.abort()
-            raise Exception(s)
+            raise OvershootException(mm_final)
 
         if ok_for_mdi(s) and not moving:
             print('state', state, 'mm_final:', mm_final)
@@ -223,10 +230,8 @@ def find_edge(video_capture, direction):
             continue
 
         if mm_final > 1.0:
-            s = 'Dangerous overshoot! mm_final={}'.format(mm_final)
-            print(s)
             cnc_c.abort()
-            raise Exception(s)
+            raise OvershootException(mm_final)
 
         in_final = mm_final / 25.4
 
@@ -525,29 +530,32 @@ def main():
             ord('9'): find_ll_corner
             }
 
-    try:
         # Warm up
         # for i in range(30):
         #     _ = haimer_camera.get_measurement(video_capture)
 
-        while True:
+    while True:
+        try:
             mm_final, key = haimer_camera.get_measurement(video_capture)
             try:
                 res = cmds[key](video_capture)
                 print(res)
             except KeyError:
                 pass
-    except haimer_camera.QuitException:
-        s = linuxcnc.stat()
-        s.poll()
+        except OvershootException as e:
+            cnc_c.abort()
+            haimer_camera.display_error(str(e))
+        except haimer_camera.QuitException:
+            s = linuxcnc.stat()
+            s.poll()
 
-        moving = is_moving(s)
+            moving = is_moving(s)
 
-        cnc_c.abort()
-        print('Quit requested', moving)
+            cnc_c.abort()
+            print('Quit requested', moving)
 
-        if moving:
-            sys.exit(1)
+            if moving:
+                sys.exit(1)
 
 
 

@@ -80,7 +80,7 @@ c_label_s = .8
 c_line_color = (0, 200, 0)
 c_line_s = 2
 
-c_center_offset = [25, -3]
+c_center_offset = [12, 3]
 c_image_center = lambda w, h: (w // 2 + c_center_offset[0], h // 2 + c_center_offset[1])
 
 
@@ -507,6 +507,12 @@ def draw_fps(image):
     cv2.putText(image, '{:.2f} fps'.format(fps), (20, 30 * 2), c_label_font, c_label_s, c_label_color)
 
 
+error_str = None
+def display_error(s):
+    global error_str
+    error_str = s
+
+
 @static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, record=False, record_ind=0)
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
@@ -585,6 +591,12 @@ def get_measurement(video_capture):
     img_all1 = np.vstack([seg_b, skel_b, image_b])
     img_all2 = np.vstack([seg_r, skel_r, image_r])
     img_all = np.hstack([img_all0, img_all1, img_all2])
+    if error_str:
+        print(error_str)
+        c_label_font_error = cv2.FONT_HERSHEY_SIMPLEX
+        c_label_color_error = (0, 0, 255)
+        c_label_s_error = 1.5
+        cv2.putText(img_all, 'WARNING: ' + error_str, (200, img_all.shape[0] // 2 - 20), c_label_font_error, c_label_s_error, c_label_color_error, 3)
     img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
     if get_measurement.record:
@@ -592,6 +604,8 @@ def get_measurement(video_capture):
         cv2.imwrite(fn1, image0)
         fn2 = 'mov_all_{:06}.ppm'.format(get_measurement.record_ind)
         cv2.imwrite(fn2, img_all)
+        fn3 = 'mov_fin_{:06}.ppm'.format(get_measurement.record_ind)
+        cv2.imwrite(fn3, image2)
         get_measurement.record_ind += 1
         print('Recorded {} {}'.format(fn1, fn2))
 
