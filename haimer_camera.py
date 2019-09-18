@@ -488,7 +488,7 @@ def draw_labels(image, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final)
     # cv2.putText(image_r, f'{theta_r:5.2f} rad {mm_r:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
     # cv2.putText(image, f'{mm_final:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
     cv2.putText(image_b, '{:5.2f} rad {:6.3f} mm'.format(theta_b, mm_b), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image_r, '{:5.2f} rad {:6.3f} mm'.format(theta_b, mm_b), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
+    cv2.putText(image_r, '{:5.2f} rad {:6.3f} mm'.format(theta_r, mm_r), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
     cv2.putText(image, '{:6.3f} mm'.format(mm_final), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
 
 
