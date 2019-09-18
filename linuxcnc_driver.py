@@ -506,7 +506,6 @@ def main():
     #
     # args = map(float, sys.argv[1:])
 
-    probe3d(None)
     global cnc_s
     global cnc_c
 
