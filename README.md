@@ -32,3 +32,10 @@ The additional commands are best seen on a numeric keypad. The direction shown o
 * 7: find lower-right corner, moving to the left, then around the corner, and then away from the operator
 * 9: find lower-left corner, moving to the right, then around the corner, and then away from the operator
 
+## Somce references
+http://www.insticc.org/Primoris/Resources/PaperPdf.ashx?idPaper=73860
+https://github.com/intel-iot-devkit/python-cv-samples/tree/master/examples/analog-gauge-reader
+https://www.researchgate.net/publication/282582478_Machine_Vision_Based_Automatic_Detection_Method_of_Indicating_Values_of_a_Pointer_Gauge/fulltext/5686db1508ae051f9af42749/Machine-Vision-Based-Automatic-Detection-Method-of-Indicating-Values-of-a-Pointer-Gauge.pdf
+https://www.degruyter.com/view/j/phys.2019.17.issue-1/phys-2019-0010/phys-2019-0010.xml
+https://pdfs.semanticscholar.org/639e/d0c018925e6b900e6ddd2956b63ffd5f56dc.pdf
+https://pdfs.semanticscholar.org/7083/1ea22f494e044c4861b3fb2bbfad578dd9a1.pdf
