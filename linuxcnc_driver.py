@@ -42,7 +42,6 @@
 #    very different than find_center_of_hole(...)
 
 
-import math
 import sys
 import time
 
@@ -72,6 +71,7 @@ def move_to(x, y, z):
     print('Command,' + cmd)
 
     cnc_c.mdi(cmd)
+
 
 #    rv = cnc_c.wait_complete(60)
 #    if rv != 1:
@@ -242,7 +242,7 @@ def find_edge(video_capture, direction):
         #    print('mm_final:', mm_final, 'in_final:', in_final, 'cur_x:', x, 'tar_x:', tar_x, 'xe:', xe, 'cmd_x:', cmd_x, ok_for_mdi(s))
 
         if ok_for_mdi(s) and not moving:
-            #print('state', state, 'total_e:', total_e, 'in_final:', in_final, 'mm_final:', mm_final)
+            # print('state', state, 'total_e:', total_e, 'in_final:', in_final, 'mm_final:', mm_final)
             print('state', state, 'in_final:', in_final, 'mm_final:', mm_final)
 
             cmd_x = x
@@ -530,9 +530,9 @@ def main():
             ord('9'): find_ll_corner
             }
 
-        # Warm up
-        # for i in range(30):
-        #     _ = haimer_camera.get_measurement(video_capture)
+    # Warm up
+    # for i in range(30):
+    #     _ = haimer_camera.get_measurement(video_capture)
 
     while True:
         try:
