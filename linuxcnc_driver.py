@@ -556,7 +556,8 @@ def main():
 
             if moving:
                 sys.exit(1)
-
+            else:
+                break
 
 
 if __name__ == "__main__":
