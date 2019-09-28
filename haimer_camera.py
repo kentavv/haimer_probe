@@ -120,6 +120,12 @@ def difference_of_angles(theta1, theta2):
     return math.atan2(math.sin(dt), math.cos(dt))
 
 
+def line_angle(pt1, pt2):
+    delta_x = pt2[0] - pt1[0]
+    delta_y = pt2[1] - pt1[1]
+    return math.atan2(delta_y, delta_x) + math.pi / 2.
+
+
 def list_camera_properties(video_cap):
     capture_properties = [('cv2.CAP_PROP_POS_MSEC', True),
                           ('cv2.CAP_PROP_POS_FRAMES', False),
@@ -256,16 +262,12 @@ def filter_lines(lines, image_center, cutoff=5):
         if md is not None:
             _, (x1, y1, x2, y2) = m_lst[0], m_lst[1][0]
 
-            delta_x = x1 - x2
-            delta_y = y1 - y2
-            a0 = math.atan2(delta_y, delta_x) + math.pi / 2.
+            a0 = line_angle((x1, y1), (x2, y2))
 
             for lst in lines2:
                 inc, (x1, y1, x2, y2) = lst[0], lst[1][0]
                 if inc:
-                    delta_x = x1 - x2
-                    delta_y = y1 - y2
-                    a1 = math.atan2(delta_y, delta_x) + math.pi / 2.
+                    a1 = line_angle((x1, y1), (x2, y2))
 
                     mt = difference_of_angles(a0, a1)
                     inc = inc and abs(mt) < math.pi / 8.
@@ -306,17 +308,11 @@ def summarize_lines(lines, image_center):
         inc, (x1, y1, x2, y2) = lst[0], lst[1][0]
 
         if inc:
+            pt0 = image_center
             pt1 = (x1, y1)
             pt2 = (x2, y2)
 
-            pt0 = image_center
-
-            def h(pt0, pt):
-                delta_x = pt[0] - pt0[0]
-                delta_y = pt[1] - pt0[1]
-                return math.atan2(delta_y, delta_x) + math.pi / 2.
-
-            aa += [h(pt0, pt1), h(pt0, pt2)]
+            aa += [line_angle(pt0, pt1), line_angle(pt0, pt2)]
 
     theta = None
     if aa:
