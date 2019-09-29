@@ -228,6 +228,7 @@ all = dict([])
 all2 = []
 
 f_perform_filter = True
+seg__ = None
 
 
 def find_holes(image):  # , image_center, seg_func, hough_threshold, hough_min_line_length, hough_max_line_gap, ll):
@@ -242,13 +243,56 @@ def find_holes(image):  # , image_center, seg_func, hough_threshold, hough_min_l
 
     t = time.time()
 
-    global all
+    global all, seg__
     if circles is not None:
         # combine similar circles
+
+        if seg__ is None:
+            seg__ = np.zeros(seg0.shape, dtype=np.int32)
+
+        seg__ -= 2
+        np.clip(seg__, 0, 255, out=seg__)
+
+        mask = np.zeros_like(seg0)
+
+        for i in circles[0, :]:
+            cv2.circle(mask, (i[0], i[1]), i[2], 255, -1)
+        cv2.imwrite('b.pgm', mask)
+        seg_ = cv2.bitwise_and(seg0, mask)
+        print((seg_ / 64).astype(np.int32).max())
+        seg__ += (seg_ / 64).astype(np.int32)
+
+        np.clip(seg__, 0, 255, out=seg__)
+        cv2.imwrite('a.pgm', seg__.astype(np.uint8))
+
+        # lst2 = []
+        # print(all2b.shape, len(all2))
+
+
+
         global all2
-        all2 += [circles]
-        all2 = all2[-5:]
-        all2b = np.vstack([x[0] for x in all2])
+        for i, c1 in enumerate(circles[0, :]):
+            min_dd = 100000000
+            min_j = -1
+            for j, c2 in enumerate(all2):
+                dx = c1[0] - c2[0]
+                dy = c1[1] - c2[1]
+                dr = c1[2] - c2[2]
+                dd = dx ** 2 + dy ** 2
+                if min_dd > dd:
+                    min_dd = dd
+                    min_j = j
+            if math.sqrt(min_dd) < 5:
+                print(i, min_j, math.sqrt(min_dd), dr)
+            else:
+                all2 += [c1]
+
+        print('aa', len(circles[0]), len(all2))
+
+        # global all2
+        # all2 += [circles]
+        # all2 = all2[-5:]
+        # all2b = np.vstack([x[0] for x in all2])
 
         # One way to combine a timeseries of circles is to paint them to a new image
         # as filled circles and then repeat HoughCircles. The circles could be filtered
@@ -291,54 +335,53 @@ def find_holes(image):  # , image_center, seg_func, hough_threshold, hough_min_l
         # O(n^2) worst case complexity, but generally will perform much better. This idea could be
         # extended to scan in the second dimension within the larger sliding window.
 
-        d = np.zeros((all2b.shape[0], all2b.shape[0]), np.float)
-        ll = all2b.tolist()
-        ll = sorted(ll)
-        ww = 20
-        ll2 = []
-        nl = [(ii, x) for ii, x in enumerate(ll) if 0 <= x[0] < ww]
-        for ss in range(seg0.shape[1] - ww):
-            if ss > 0:
-                ll2 = [x for x in ll2 if ss < x[1][0]]
-                nl = [(ii, x) for ii, x in enumerate(ll) if ss + ww - 1 - 1 <= x[0] < ss + ww - 1]
-
-            # print(ss, ss + ww - 1, len(ll2), len(ll), len(nl))
-
-            for ii in range(len(nl)):
-                for jj in range(ii + 1, len(nl)):
-                    i, iii = nl[ii]
-                    j, jjj = nl[jj]
-                    # print(all2b[i], all2b[j])
-                    dd = (all2b[i][0] - all2b[j][0]) ** 2 + (all2b[i][1] - all2b[j][1]) ** 2
-                    d[i][j] = dd
-                    d[j][i] = dd
-
-            for ii in range(len(nl)):
-                for jj in range(len(ll2)):
-                    i, iii = nl[ii]
-                    j, jjj = ll2[jj]
-                    # print(all2b[i], all2b[j])
-                    dd = (all2b[i][0] - all2b[j][0]) ** 2 + (all2b[i][1] - all2b[j][1]) ** 2
-                    d[i][j] = dd
-                    d[j][i] = dd
-
-            ll2 += nl
-
-        print(d)
+        # d = np.zeros((all2b.shape[0], all2b.shape[0]), np.float)
+        # ll = circles[0].tolist()
+        # ll = sorted(ll)
+        # ww = 20
+        # ll2 = []
+        # nl = [(ii, x) for ii, x in enumerate(ll) if 0 <= x[0] < ww]
+        # for ss in range(seg0.shape[1] - ww):
+        #     if ss > 0:
+        #         ll2 = [x for x in ll2 if ss < x[1][0]]
+        #         nl = [(ii, x) for ii, x in enumerate(ll) if ss + ww - 1 - 1 <= x[0] < ss + ww - 1]
+        #
+        #     # print(ss, ss + ww - 1, len(ll2), len(ll), len(nl))
+        #
+        #     for ii in range(len(nl)):
+        #         for jj in range(ii + 1, len(nl)):
+        #             i, iii = nl[ii]
+        #             j, jjj = nl[jj]
+        #             # print(all2b[i], all2b[j])
+        #             dd = (all2b[i][0] - all2b[j][0]) ** 2 + (all2b[i][1] - all2b[j][1]) ** 2
+        #             d[i][j] = dd
+        #             d[j][i] = dd
+        #
+        #     for ii in range(len(nl)):
+        #         for jj in range(len(ll2)):
+        #             i, iii = nl[ii]
+        #             j, jjj = ll2[jj]
+        #             # print(all2b[i], all2b[j])
+        #             dd = (all2b[i][0] - all2b[j][0]) ** 2 + (all2b[i][1] - all2b[j][1]) ** 2
+        #             d[i][j] = dd
+        #             d[j][i] = dd
+        #
+        #     ll2 += nl
+        #
+        # print(d)
 
         # mask = np.zeros_like(seg0)
         # for i in all2b:
         #     cv2.circle(mask, (i[0], i[1]), i[2], 255, -1)
         # cv2.imwrite('aa.png', mask)
 
-        lst2 = []
-        print(all2b.shape, len(all2))
+        # lst2 = []
+        # print(all2b.shape, len(all2))
 
         # summarize_circles()
         circles = np.uint16(np.around(circles))
         for i in circles[0, :]:
             tup = tuple(i)
-            # print(tup)
             if tup not in all:
                 all[tup] = [0, t]
 
