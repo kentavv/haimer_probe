@@ -33,6 +33,8 @@ import time
 import cv2
 import numpy as np
 
+c_camera_name = 'Z-Camera'
+
 c_final_image_scale_factor = 1
 
 c_label_font = cv2.FONT_HERSHEY_SIMPLEX
@@ -44,6 +46,9 @@ c_line_s = 2
 
 c_crop_rect = None
 c_machine_rect = [[0.0, 0.0], [4.266, 3.0]]
+
+c_demo_mode = False
+
 
 class QuitException(Exception):
     pass
@@ -444,8 +449,10 @@ def get_measurement(video_capture):
     draw_fps(final_img)
 
     if not get_measurement.pause_updates:
-        cv2.imshow("Live", final_img)
-    key = cv2.waitKey(5) & 0xff
+        cv2.imshow(c_camera_name, final_img)
+
+
+def process_key(key):
     if key == ord('p'):
         get_measurement.pause_updates = not get_measurement.pause_updates
     elif key == ord('r'):
@@ -481,9 +488,9 @@ def get_measurement(video_capture):
         raise QuitException
     elif key >= 0:
         # print(key)
-        pass
+        return False
 
-    return None, key
+    return True
 
 
 mouse_pts = []
@@ -524,7 +531,11 @@ def click_and_crop(event, x, y, flags, param):
 
 
 def gauge_vision_setup():
-    np.set_printoptions(precision=2)
+    cv2.namedWindow(c_camera_name)
+    cv2.setMouseCallback(c_camera_name, click_and_crop)
+
+    if c_demo_mode:
+        return None
 
     video_capture = cv2.VideoCapture(1)
     if not video_capture.isOpened():
@@ -538,16 +549,15 @@ def gauge_vision_setup():
 
 
 def main():
-    # video_capture = gauge_vision_setup()
-    video_capture = None
+    np.set_printoptions(precision=2)
 
-    cv2.namedWindow("Live")
-    cv2.setMouseCallback("Live", click_and_crop)
+    video_capture = gauge_vision_setup()
 
     while True:
         try:
-            mm_final, key = get_measurement(video_capture)
-            # print('mm_final:', mm_final)
+            get_measurement(video_capture)
+            key = cv2.waitKey(5) & 0xff
+            process_key(key)
         except QuitException:
             break
 

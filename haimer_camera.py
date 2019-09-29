@@ -46,6 +46,8 @@ import time
 import cv2
 import numpy as np
 
+c_camera_name = 'HaimerCamera'
+
 c_haimer_ball_diam = 4.  # millimeters
 
 c_dial_outer_mask_r = 220
@@ -608,8 +610,11 @@ def get_measurement(video_capture):
         print('Recorded {} {}'.format(fn1, fn2))
 
     if not get_measurement.pause_updates:
-        cv2.imshow("Live", img_all_resized)
-    key = cv2.waitKey(5)
+        cv2.imshow(c_camera_name, img_all_resized)
+
+    return mm_final
+
+def process_key(key):
     if key == ord('p'):
         get_measurement.pause_updates = not get_measurement.pause_updates
     elif key == ord('r'):
@@ -647,14 +652,12 @@ def get_measurement(video_capture):
         raise QuitException
     elif key >= 0:
         # print(key)
-        pass
+        return False
 
-    return mm_final, key
+    return True
 
 
 def gauge_vision_setup():
-    np.set_printoptions(precision=2)
-
     video_capture = cv2.VideoCapture(0)
     if not video_capture.isOpened():
         print('camera is not open')
@@ -667,11 +670,15 @@ def gauge_vision_setup():
 
 
 def main():
+    np.set_printoptions(precision=2)
+
     video_capture = gauge_vision_setup()
 
     while True:
         try:
-            mm_final, key = get_measurement(video_capture)
+            mm_final = get_measurement(video_capture)
+            key = cv2.waitKey(5) & 0xff
+            process_key(key)
             # print('mm_final:', mm_final)
         except QuitException:
             break

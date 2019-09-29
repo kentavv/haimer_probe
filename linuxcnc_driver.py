@@ -45,9 +45,12 @@
 import sys
 import time
 
+import cv2
+
 import linuxcnc
 
 import haimer_camera
+import z_camera
 
 c_slow_dwell = 2.
 c_fast_dwell = .5
@@ -224,7 +227,7 @@ def find_edge(video_capture, direction):
 
         print(s.axis[0])
 
-        mm_final, _ = haimer_camera.get_measurement(video_capture)
+        mm_final = haimer_camera.get_measurement(video_capture)
         if mm_final is None:
             print('mm_final is None')
             continue
@@ -518,6 +521,8 @@ def main():
     cnc_c = linuxcnc.command()
 
     video_capture = haimer_camera.gauge_vision_setup()
+    video_capture2 = z_camera.gauge_vision_setup()
+
     cmds = {ord('0'): find_center_of_hole,
             ord('4'): find_right_edge,
             ord('6'): find_left_edge,
@@ -536,7 +541,13 @@ def main():
 
     while True:
         try:
-            mm_final, key = haimer_camera.get_measurement(video_capture)
+            mm_final = haimer_camera.get_measurement(video_capture)
+            z_camera.get_measurement(video_capture2)
+            key = cv2.waitKey(5)
+
+            if not haimer_camera.process_key(key):
+                z_camera.process_key(key)
+
             try:
                 res = cmds[key](video_capture)
                 print(res)
