@@ -235,6 +235,47 @@ def find_holes(image):  # , image_center, seg_func, hough_threshold, hough_min_l
     image, seg0 = seg_func(image)
     cv2.imwrite('a.png', seg0)
 
+    # seg0 = cv2.bitwise_not(seg0)
+    # Setup SimpleBlobDetector parameters.
+    params = cv2.SimpleBlobDetector_Params()
+
+    # Change thresholds
+    params.minThreshold = 0
+    params.maxThreshold = 255
+
+    # Filter by Area.
+    params.filterByArea = True
+    params.minArea = 250
+    params.maxArea = 25000
+
+    # Filter by Circularity
+    params.filterByCircularity = True
+    params.minCircularity = 0.7
+
+    # Filter by Convexity
+    params.filterByConvexity = False
+    params.minConvexity = 0.87
+
+    # Filter by Inertia
+    params.filterByInertia = False
+    params.minInertiaRatio = 0.01
+
+    # Create a detector with the parameters
+    detector = cv2.SimpleBlobDetector_create(params)
+
+
+    # seg0 = cv2.cvtColor(image, cv2.cv2.COLOR_BGR2GRAY)
+    # detector = cv2.SimpleBlobDetector_create()
+
+    keypoints = detector.detect(cv2.bitwise_not(seg0))
+    seg0 = cv2.drawKeypoints(seg0, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+
+    for i in keypoints:
+        print(i.pt)
+
+    return None, image, seg0, None
+
+
     # m = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
     # seg0 = cv2.morphologyEx(seg0, cv2.MORPH_OPEN, m, iterations=1)
 
