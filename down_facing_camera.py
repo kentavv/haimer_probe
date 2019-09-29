@@ -22,7 +22,8 @@
 
 
 # Ideas and observations:
-# 1) How should non-circular holes be supported?
+# 1) How should non-circular holes be supported? Including rectangular,
+#    ellipse, and slots.
 
 import math
 import os
@@ -42,7 +43,7 @@ c_line_color = (0, 200, 0)
 c_line_s = 2
 
 c_crop_rect = None
-
+c_machine_rect = [[0.0, 0.0], [4.266, 3.0]]
 
 class QuitException(Exception):
     pass
@@ -195,8 +196,9 @@ def black_arrow_mask(image):
 
 def find_holes(image):
     mask = black_arrow_mask(image)
+    gray = cv2.cvtColor(cv2.bitwise_and(mask, image), cv2.COLOR_BGR2GRAY)
+    image /= 2
     image[cv2.bitwise_not(mask) == 255] /= 2
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     params = cv2.SimpleBlobDetector_Params()
 
@@ -248,6 +250,7 @@ def find_holes(image):
     keypoints = detector.detect(gray)
 
     def draw_circles(img, keypoints):
+        global c_crop_rect, c_machine_rect
         if keypoints:
             for kp in keypoints:
                 pt = (int(round(kp.pt[0])), int(round(kp.pt[1])))
@@ -255,10 +258,28 @@ def find_holes(image):
                 cv2.circle(img, pt, sz, (0, 255, 0), 2)
                 cv2.circle(img, pt, 2, (0, 0, 255), 3)
 
-                x = pt[0] + sz
-                y = pt[1] + sz
-                a = (kp.size / 2) ** 2 * math.pi
-                cv2.putText(img, '{:.1f} {:.1f}'.format(kp.size, a), (x, y + 20 * 1), c_label_font, c_label_s, c_label_color)
+                pt = kp.pt
+                sz = kp.size/2
+                x = int(round(pt[0] + sz))
+                y = int(round(pt[1] + sz))
+   
+                if c_crop_rect is None or c_machine_rect is None:
+                    a = (sz / 2) ** 2 * math.pi
+                    cv2.putText(img, '{:.1f} {:.1f}'.format(kp.size, a), (x, y + 20 * 1), c_label_font, c_label_s, c_label_color)
+                else:
+                    pt0 = c_crop_rect[0]
+                    mpt0 = c_machine_rect[0]
+                    w = c_crop_rect[1][0] - c_crop_rect[0][0]
+                    h = c_crop_rect[1][1] - c_crop_rect[0][1]
+                    mw = c_machine_rect[1][0] - c_machine_rect[0][0]
+                    mh = c_machine_rect[1][1] - c_machine_rect[0][1]
+
+                    mx = mpt0[0] + ((pt[0] - pt0[0]) / float(w) * mw)
+                    my = mpt0[1] - ((pt[1] - pt0[1]) / float(h) * mh)
+
+                    diam = kp.size / float(w) * mw
+
+                    cv2.putText(img, '{:.3f} {:.3f} {:.3f}'.format(mx, my, diam), (x, y + 20 * 1), c_label_font, c_label_s, c_label_color)
 
     # image = cv2.drawKeypoints(image, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
     draw_circles(image, keypoints)
