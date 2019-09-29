@@ -32,8 +32,6 @@ import time
 import cv2
 import numpy as np
 
-c_initial_image_rot = (-3.04) / 180. * math.pi
-
 c_final_image_scale_factor = 1
 
 c_label_font = cv2.FONT_HERSHEY_SIMPLEX
@@ -43,7 +41,7 @@ c_label_s = .8
 c_line_color = (0, 200, 0)
 c_line_s = 2
 
-c_crop_rect = [(0, 0), (1280, 720)]
+c_crop_rect = None
 
 
 class QuitException(Exception):
@@ -158,6 +156,12 @@ def line_angle(pt1, pt2):
     return math.atan2(delta_y, delta_x)
 
 
+def line_length(pt1, pt2):
+    delta_x = pt2[0] - pt1[0]
+    delta_y = pt2[1] - pt1[1]
+    return math.sqrt(delta_x ** 2 + delta_y ** 2)
+
+
 def summarize_lines(lines, image_center):
     aa = []
 
@@ -180,16 +184,18 @@ def summarize_lines(lines, image_center):
 
 
 def black_arrow_mask(image):
-    mask = np.zeros(image.shape, dtype=image.dtype)
-
-    cv2.rectangle(mask, c_crop_rect[0], c_crop_rect[1], (255, 255, 255), -1)
+    if c_crop_rect is None:
+        mask = np.ones(image.shape, dtype=image.dtype) * 255
+    else:
+        mask = np.zeros(image.shape, dtype=image.dtype)
+        cv2.rectangle(mask, c_crop_rect[0], c_crop_rect[1], (255, 255, 255), -1)
 
     return mask
 
 
 def find_holes(image):
     mask = black_arrow_mask(image)
-    image = cv2.bitwise_and(image, mask)
+    image[cv2.bitwise_not(mask) == 255] /= 2
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     params = cv2.SimpleBlobDetector_Params()
@@ -318,23 +324,21 @@ def next_frame(video_capture, debug=True):
     return image0
 
 
-@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, record=False, record_ind=0, mouse_op='alignment', c_view = 3, image_center = None)
+@static_vars(pause_updates=False, record=False, record_ind=0, mouse_op='alignment', c_view = 3, warp_m = None)
 def get_measurement(video_capture):
     image0 = next_frame(video_capture)
 
-    h, w = image0.shape[:2]
-    if get_measurement.image_center is None:
-        get_measurement.image_center = (w // 2, h // 2)
-
-    global c_initial_image_rot
-    m = cv2.getRotationMatrix2D(get_measurement.image_center, c_initial_image_rot / math.pi * 180., 1.0)
-    image1 = cv2.warpAffine(image0, m, (w, h))
-    image2 = image1.copy()
+    if get_measurement.warp_m is not None:
+        h, w = image0.shape[:2]
+	warped = cv2.warpPerspective(image0, get_measurement.warp_m, (w, h)) 
+        image1 = warped
+    else:
+        image1 = image0.copy()
 
     image_b = find_holes(image1)
 
     global c_crop_rect
-    cv2.rectangle(image1, c_crop_rect[0], c_crop_rect[1], c_line_color, c_line_s)
+    # cv2.rectangle(image1, c_crop_rect[0], c_crop_rect[1], c_line_color, c_line_s)
 
     global c_view
 
@@ -375,17 +379,45 @@ def get_measurement(video_capture):
             pt2 = tuple([int(round(x / c_final_image_scale_factor)) for x in mouse_pts[1]])
 
             if get_measurement.mouse_op == 'alignment' and get_measurement.c_view == 1:
-                cv2.line(final_img, pt1, pt2, (255, 0, 255), thickness=3)
-                if not mouse_moving:
-                    c_initial_image_rot = line_angle(*mouse_pts)
-                    get_measurement.image_center = (mouse_pts[0][0], mouse_pts[0][1])
-                    mouse_pts = []
-                    get_measurement.c_view = 2
-            elif get_measurement.mouse_op == 'crop' and get_measurement.c_view == 2:
-                cv2.rectangle(final_img, pt1, pt2, (255, 0, 255), thickness=3)
-                if not mouse_moving:
-                    c_crop_rect = [pt1, pt2]
-                    mouse_pts = []
+                if mouse_sqr_pts_done:
+                    pt1 = mouse_sqr_pts[0]
+                    pt2 = mouse_sqr_pts[1]
+                    cv2.line(final_img, pt1, pt2, (255, 0, 255), thickness=3)
+
+                    pt1 = mouse_sqr_pts[1]
+                    pt2 = mouse_sqr_pts[2]
+                    cv2.line(final_img, pt1, pt2, (255, 0, 255), thickness=3)
+
+                    pt1 = mouse_sqr_pts[2]
+                    pt2 = mouse_sqr_pts[3]
+                    cv2.line(final_img, pt1, pt2, (255, 0, 255), thickness=3)
+
+                    pt1 = mouse_sqr_pts[3]
+                    pt2 = mouse_sqr_pts[0]
+                    cv2.line(final_img, pt1, pt2, (255, 0, 255), thickness=3)
+           
+                    rct = np.array(mouse_sqr_pts, dtype = np.float32)
+                    w1 = line_length(mouse_sqr_pts[0], mouse_sqr_pts[1])
+                    w2 = line_length(mouse_sqr_pts[2], mouse_sqr_pts[3])
+                    h1 = line_length(mouse_sqr_pts[0], mouse_sqr_pts[3])
+                    h2 = line_length(mouse_sqr_pts[1], mouse_sqr_pts[2])
+                    w = max(w1, w2)
+                    h = max(h1, h2)
+      
+                    pt1 = mouse_sqr_pts[0]
+                    dst0 = [pt1, [pt1[0] + w, pt1[1]], [pt1[0] + w, pt1[1] + h], [pt1[0], pt1[1] + h]]
+                    dst = np.array(dst0, dtype = np.float32)
+
+                    get_measurement.warp_m = cv2.getPerspectiveTransform(rct, dst)
+
+                    pt1, pt2 = dst0[0], dst0[2]
+                    off = 10
+                    c_crop_rect = [(int(round(pt1[0] - off)), int(round(pt1[1] - off))), (int(round(pt2[0] + off)), int(round(pt2[1] + off)))]
+
+	            mouse_sqr_pts = []
+                    mouse_sqr_pts_done = False
+
+                    get_measurement.c_view = 3
 
         if get_measurement.c_view not in [1, 2]:
             mouse_pts = []
@@ -415,9 +447,10 @@ def get_measurement(video_capture):
     elif key == ord('a'):
         get_measurement.mouse_op = 'alignment'
         get_measurement.c_view = 1
-    elif key == ord('c'):
-        get_measurement.mouse_op = 'crop'
-        get_measurement.c_view = 2
+        global mouse_sqr_pts
+        mouse_sqr_pts = []
+        global mouse_sqr_pts_done
+        mouse_sqr_pts_done = False
     # elif key == ord('f'):
     #     find_holes.f_perform_filter = not find_holes.f_perform_filter
     elif key == ord('0'):
@@ -439,6 +472,8 @@ def get_measurement(video_capture):
 
 mouse_pts = []
 mouse_moving = False
+mouse_sqr_pts = []
+mouse_sqr_pts_done = False
 
 
 def click_and_crop(event, x, y, flags, param):
@@ -456,6 +491,12 @@ def click_and_crop(event, x, y, flags, param):
         if len(mouse_pts) == 2:
             mouse_pts[1] = (x, y)
             mouse_moving = False
+        global mouse_sqr_pts
+        global mouse_sqr_pts_done
+        mouse_sqr_pts += [(x, y)]
+        print(mouse_sqr_pts)
+        if len(mouse_sqr_pts) == 4:
+            mouse_sqr_pts_done = True
 
 
 def gauge_vision_setup():
