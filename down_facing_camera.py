@@ -325,9 +325,15 @@ def next_frame(video_capture, debug=True):
 
 
 def draw_selected_points(img, pts, c = (255, 64, 32), t = 3):
-    for i in range(len(pts)):
-        pt1, pt2 = pts[i], pts[(i + 1) % len(pts)]
-        cv2.line(img, pt1, pt2, c, thickness=t, lineType=cv2.LINE_AA)
+    # for i in range(len(pts)):
+    #     pt1, pt2 = pts[i], pts[(i + 1) % len(pts)]
+    #     cv2.line(img, pt1, pt2, c, thickness=t, lineType=cv2.LINE_AA)
+    for pt in pts:
+        c = (0, 0, 255)
+        t = 1
+        off = 10
+        cv2.line(img, (pt[0]-off, pt[1]), (pt[0]+off, pt[1]), c, thickness=t, lineType=cv2.LINE_AA)
+        cv2.line(img, (pt[0], pt[1]-off), (pt[0], pt[1]+off), c, thickness=t, lineType=cv2.LINE_AA)
 
 
 @static_vars(pause_updates=False, record=False, record_ind=0, mouse_op='alignment', c_view = 3, warp_m = None)
