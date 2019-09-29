@@ -324,6 +324,12 @@ def next_frame(video_capture, debug=True):
     return image0
 
 
+def draw_selected_points(img, pts, c = (255, 64, 32), t = 3):
+    for i in range(len(pts)):
+        pt1, pt2 = pts[i], pts[(i + 1) % len(pts)]
+        cv2.line(img, pt1, pt2, c, thickness=t, lineType=cv2.LINE_AA)
+
+
 @static_vars(pause_updates=False, record=False, record_ind=0, mouse_op='alignment', c_view = 3, warp_m = None)
 def get_measurement(video_capture):
     image0 = next_frame(video_capture)
@@ -355,6 +361,10 @@ def get_measurement(video_capture):
     elif get_measurement.c_view == 3:
         final_img = image_b
 
+    global mouse_sqr_pts_done, mouse_sqr_pts
+    if not mouse_sqr_pts_done:
+        draw_selected_points(final_img, mouse_sqr_pts)
+
     if error_str:
         print(error_str)
         c_label_font_error = cv2.FONT_HERSHEY_SIMPLEX
@@ -373,51 +383,32 @@ def get_measurement(video_capture):
         print('Recorded {} {}'.format(fn1, fn3))
 
     if not get_measurement.pause_updates:
-        global mouse_pts, mouse_moving
-        if len(mouse_pts) == 2 and mouse_pts[1] is not None:
-            pt1 = tuple([int(round(x / c_final_image_scale_factor)) for x in mouse_pts[0]])
-            pt2 = tuple([int(round(x / c_final_image_scale_factor)) for x in mouse_pts[1]])
+        if get_measurement.mouse_op == 'alignment' and get_measurement.c_view == 1:
+            if mouse_sqr_pts_done:
+                # draw_selected_points(final_img, mouse_sqr_pts)
+       
+                rct = np.array(mouse_sqr_pts, dtype = np.float32)
+                w1 = line_length(mouse_sqr_pts[0], mouse_sqr_pts[1])
+                w2 = line_length(mouse_sqr_pts[2], mouse_sqr_pts[3])
+                h1 = line_length(mouse_sqr_pts[0], mouse_sqr_pts[3])
+                h2 = line_length(mouse_sqr_pts[1], mouse_sqr_pts[2])
+                w = max(w1, w2)
+                h = max(h1, h2)
+    
+                pt1 = mouse_sqr_pts[0]
+                dst0 = [pt1, [pt1[0] + w, pt1[1]], [pt1[0] + w, pt1[1] + h], [pt1[0], pt1[1] + h]]
+                dst = np.array(dst0, dtype = np.float32)
 
-            if get_measurement.mouse_op == 'alignment' and get_measurement.c_view == 1:
-                if mouse_sqr_pts_done:
-                    pt1 = mouse_sqr_pts[0]
-                    pt2 = mouse_sqr_pts[1]
-                    cv2.line(final_img, pt1, pt2, (255, 0, 255), thickness=3)
+                get_measurement.warp_m = cv2.getPerspectiveTransform(rct, dst)
 
-                    pt1 = mouse_sqr_pts[1]
-                    pt2 = mouse_sqr_pts[2]
-                    cv2.line(final_img, pt1, pt2, (255, 0, 255), thickness=3)
+                pt1, pt2 = dst0[0], dst0[2]
+                off = 10
+                c_crop_rect = [(int(round(pt1[0] - off)), int(round(pt1[1] - off))), (int(round(pt2[0] + off)), int(round(pt2[1] + off)))]
 
-                    pt1 = mouse_sqr_pts[2]
-                    pt2 = mouse_sqr_pts[3]
-                    cv2.line(final_img, pt1, pt2, (255, 0, 255), thickness=3)
+                mouse_sqr_pts = []
+                mouse_sqr_pts_done = False
 
-                    pt1 = mouse_sqr_pts[3]
-                    pt2 = mouse_sqr_pts[0]
-                    cv2.line(final_img, pt1, pt2, (255, 0, 255), thickness=3)
-           
-                    rct = np.array(mouse_sqr_pts, dtype = np.float32)
-                    w1 = line_length(mouse_sqr_pts[0], mouse_sqr_pts[1])
-                    w2 = line_length(mouse_sqr_pts[2], mouse_sqr_pts[3])
-                    h1 = line_length(mouse_sqr_pts[0], mouse_sqr_pts[3])
-                    h2 = line_length(mouse_sqr_pts[1], mouse_sqr_pts[2])
-                    w = max(w1, w2)
-                    h = max(h1, h2)
-      
-                    pt1 = mouse_sqr_pts[0]
-                    dst0 = [pt1, [pt1[0] + w, pt1[1]], [pt1[0] + w, pt1[1] + h], [pt1[0], pt1[1] + h]]
-                    dst = np.array(dst0, dtype = np.float32)
-
-                    get_measurement.warp_m = cv2.getPerspectiveTransform(rct, dst)
-
-                    pt1, pt2 = dst0[0], dst0[2]
-                    off = 10
-                    c_crop_rect = [(int(round(pt1[0] - off)), int(round(pt1[1] - off))), (int(round(pt2[0] + off)), int(round(pt2[1] + off)))]
-
-	            mouse_sqr_pts = []
-                    mouse_sqr_pts_done = False
-
-                    get_measurement.c_view = 3
+                get_measurement.c_view = 3
 
         if get_measurement.c_view not in [1, 2]:
             mouse_pts = []
@@ -447,9 +438,7 @@ def get_measurement(video_capture):
     elif key == ord('a'):
         get_measurement.mouse_op = 'alignment'
         get_measurement.c_view = 1
-        global mouse_sqr_pts
         mouse_sqr_pts = []
-        global mouse_sqr_pts_done
         mouse_sqr_pts_done = False
     # elif key == ord('f'):
     #     find_holes.f_perform_filter = not find_holes.f_perform_filter
@@ -478,24 +467,32 @@ mouse_sqr_pts_done = False
 
 def click_and_crop(event, x, y, flags, param):
     global mouse_pts, mouse_moving
+    global mouse_sqr_pts
+    global mouse_sqr_pts_done
 
     if event == cv2.EVENT_LBUTTONDOWN:
         mouse_pts = [(x, y), None]
+        mouse_sqr_pts += [(x, y)]
+        if len(mouse_sqr_pts) == 1:
+            mouse_sqr_pts += [(x, y)]
 
     elif event == cv2.EVENT_MOUSEMOVE:
         if len(mouse_pts) == 2:
             mouse_pts[1] = (x, y)
             mouse_moving = True
+            if mouse_sqr_pts:
+                mouse_sqr_pts[-1] = (x, y)
 
     elif event == cv2.EVENT_LBUTTONUP:
         if len(mouse_pts) == 2:
             mouse_pts[1] = (x, y)
             mouse_moving = False
-        global mouse_sqr_pts
-        global mouse_sqr_pts_done
-        mouse_sqr_pts += [(x, y)]
-        print(mouse_sqr_pts)
-        if len(mouse_sqr_pts) == 4:
+
+        if not mouse_sqr_pts_done:
+            mouse_sqr_pts[-1] = (x, y)
+
+        if len(mouse_sqr_pts) > 4:
+            mouse_sqr_pts = mouse_sqr_pts[:4]
             mouse_sqr_pts_done = True
 
 
