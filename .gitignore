@@ -1,3 +1,4 @@
+*.sw?
 *.ppm
 *.pgm
 *.png
