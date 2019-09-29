@@ -224,7 +224,7 @@ def seg_func(image):
     return image, seg
 
 
-all = dict([])
+all1 = dict([])
 all2 = []
 
 f_perform_filter = True
@@ -233,10 +233,7 @@ seg__ = None
 
 def find_holes(image):  # , image_center, seg_func, hough_threshold, hough_min_line_length, hough_max_line_gap, ll):
     image, seg0 = seg_func(image)
-    cv2.imwrite('a.png', seg0)
 
-    # seg0 = cv2.bitwise_not(seg0)
-    # Setup SimpleBlobDetector parameters.
     params = cv2.SimpleBlobDetector_Params()
 
     # Change thresholds
@@ -260,75 +257,126 @@ def find_holes(image):  # , image_center, seg_func, hough_threshold, hough_min_l
     params.filterByInertia = False
     params.minInertiaRatio = 0.01
 
-    # Create a detector with the parameters
     detector = cv2.SimpleBlobDetector_create(params)
 
-
-    # seg0 = cv2.cvtColor(image, cv2.cv2.COLOR_BGR2GRAY)
-    # detector = cv2.SimpleBlobDetector_create()
-
     keypoints = detector.detect(cv2.bitwise_not(seg0))
-    seg0 = cv2.drawKeypoints(seg0, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    image = cv2.drawKeypoints(image, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
-    for i in keypoints:
-        print(i.pt)
+    t = time.time()
+    global all1
+    for kp in keypoints:
+        ipt = (int(round(kp.pt[0])), int(round(kp.pt[1])))
+        isz = int(round(kp.size/2))
+
+        tup = (ipt[0], ipt[1], isz)
+        if tup not in all1:
+            all1[tup] = [0, t, 0.]
+
+        mask = np.zeros_like(seg0)
+        cv2.circle(mask, ipt, isz, 255, -1)
+        seg_ = cv2.bitwise_and(seg0, mask)
+        cc = cv2.countNonZero(seg_)
+        cov = cc / (isz ** 2 * math.pi)
+
+        all1[tup] = [all1[tup][0] + 1, t, cov]
+
+        # remove_old_circles()
+        for k in list(all1.keys()):
+            v = all1[k]
+            if t - v[1] > .5:
+                del all1[k]
+            # elif v[2] < .80:
+            #     del all1[k]
+
+    def draw_circles(img, keypoints):
+        if keypoints:
+            for kp in keypoints:
+                pt = (int(round(kp.pt[0])), int(round(kp.pt[1])))
+                sz = int(round(kp.size/2))
+                cv2.circle(img, pt, sz, (0, 255, 0), 2)
+                cv2.circle(img, pt, 2, (0, 0, 255), 3)
+
+                x = pt[0] + sz
+                y = pt[1] + sz
+                #cv2.putText(img, '{:d} {:.1f} {:.2f}'.format(v[0], t - v[1], v[2]), (x, y + 30 * 1), c_label_font, c_label_s, c_label_color)
+                cv2.putText(img, '{:.2f}'.format(kp.size), (x, y + 30 * 1), c_label_font, c_label_s, c_label_color)
+
+    def draw_circles2(img, keypoints):
+            for pt_sz,v in keypoints.items():
+                pt, sz = pt_sz[:2], pt_sz[-1]
+                cnt, t0, cov = v
+                cv2.circle(img, pt, int(round(sz)), (0, 255, 0), 2)
+                cv2.circle(img, pt, 2, (0, 0, 255), 3)
+
+                x = pt[0] + int(round(sz))
+                y = pt[1] + int(round(sz))
+                print(x, y)
+                cv2.putText(img, '{:d} {:.1f} {:.2f} {:.2f}'.format(cnt, t - t0, cov, sz), (x, y + 30 * 1), c_label_font, c_label_s, c_label_color)
+                #cv2.putText(img, '{:.2f}'.format(kp.size), (x, y + 30 * 1), c_label_font, c_label_s, c_label_color)
+
+    #draw_circles(seg0, keypoints)
+    seg0 = cv2.cvtColor(seg0, cv2.cv2.COLOR_GRAY2BGR)
+    draw_circles2(seg0, all1)
 
     return None, image, seg0, None
 
 
-    # m = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    # seg0 = cv2.morphologyEx(seg0, cv2.MORPH_OPEN, m, iterations=1)
+def find_holes(image):  # , image_center, seg_func, hough_threshold, hough_min_line_length, hough_max_line_gap, ll):
+    image, seg0 = seg_func(image)
 
     circles = cv2.HoughCircles(seg0, cv2.HOUGH_GRADIENT, .5, 40,
                                param1=40, param2=10, minRadius=2, maxRadius=60)
 
     t = time.time()
 
-    global all, seg__
+    global all1, seg__
     if circles is not None:
         # combine similar circles
 
-        if seg__ is None:
-            seg__ = np.zeros(seg0.shape, dtype=np.int32)
+        # One ideas was to paint the circles to a separate grayscale accumulation mask. 
+        # With each iteration lower the intensity of all pixels and add the pixels from 
+        # the b/w segmented image, masked with the detected circle and scaled down. Roughly,
+        # this creates a map of the most recently detected areas decaying as time advances.
+        # if seg__ is None:
+        #     seg__ = np.zeros(seg0.shape, dtype=np.int32)
 
-        seg__ -= 2
-        np.clip(seg__, 0, 255, out=seg__)
+        # seg__ -= 2
+        # np.clip(seg__, 0, 255, out=seg__)
 
-        mask = np.zeros_like(seg0)
+        # mask = np.zeros_like(seg0)
 
-        for i in circles[0, :]:
-            cv2.circle(mask, (i[0], i[1]), i[2], 255, -1)
-        cv2.imwrite('b.pgm', mask)
-        seg_ = cv2.bitwise_and(seg0, mask)
-        print((seg_ / 64).astype(np.int32).max())
-        seg__ += (seg_ / 64).astype(np.int32)
+        # for i in circles[0, :]:
+        #     cv2.circle(mask, (i[0], i[1]), i[2], 255, -1)
+        # cv2.imwrite('b.pgm', mask)
+        # seg_ = cv2.bitwise_and(seg0, mask)
+        # print((seg_ / 64).astype(np.int32).max())
+        # seg__ += (seg_ / 64).astype(np.int32)
 
-        np.clip(seg__, 0, 255, out=seg__)
-        cv2.imwrite('a.pgm', seg__.astype(np.uint8))
+        # np.clip(seg__, 0, 255, out=seg__)
+        # cv2.imwrite('a.pgm', seg__.astype(np.uint8))
 
         # lst2 = []
         # print(all2b.shape, len(all2))
 
 
+        # global all2
+        # for i, c1 in enumerate(circles[0, :]):
+        #     min_dd = 100000000
+        #     min_j = -1
+        #     for j, c2 in enumerate(all2):
+        #         dx = c1[0] - c2[0]
+        #         dy = c1[1] - c2[1]
+        #         dr = c1[2] - c2[2]
+        #         dd = dx ** 2 + dy ** 2
+        #         if min_dd > dd:
+        #             min_dd = dd
+        #             min_j = j
+        #     if math.sqrt(min_dd) < 5:
+        #         print(i, min_j, math.sqrt(min_dd), dr)
+        #     else:
+        #         all2 += [c1]
 
-        global all2
-        for i, c1 in enumerate(circles[0, :]):
-            min_dd = 100000000
-            min_j = -1
-            for j, c2 in enumerate(all2):
-                dx = c1[0] - c2[0]
-                dy = c1[1] - c2[1]
-                dr = c1[2] - c2[2]
-                dd = dx ** 2 + dy ** 2
-                if min_dd > dd:
-                    min_dd = dd
-                    min_j = j
-            if math.sqrt(min_dd) < 5:
-                print(i, min_j, math.sqrt(min_dd), dr)
-            else:
-                all2 += [c1]
-
-        print('aa', len(circles[0]), len(all2))
+        # print('aa', len(circles[0]), len(all2))
 
         # global all2
         # all2 += [circles]
@@ -423,8 +471,8 @@ def find_holes(image):  # , image_center, seg_func, hough_threshold, hough_min_l
         circles = np.uint16(np.around(circles))
         for i in circles[0, :]:
             tup = tuple(i)
-            if tup not in all:
-                all[tup] = [0, t]
+            if tup not in all1:
+                all1[tup] = [0, t]
 
             mask = np.zeros_like(seg0)
             cv2.circle(mask, (i[0], i[1]), i[2], 255, -1)
@@ -439,17 +487,17 @@ def find_holes(image):  # , image_center, seg_func, hough_threshold, hough_min_l
             cov = cc / (r ** 2 * math.pi)
             # print(cc, cc2.shape, cov)
 
-            all[tup] = [all[tup][0] + 1, t, cov]
+            all1[tup] = [all1[tup][0] + 1, t, cov]
 
         # remove_old_circles()
-        for k in list(all.keys()):
-            v = all[k]
+        for k in list(all1.keys()):
+            v = all1[k]
             if t - v[1] > .5:
-                del all[k]
+                del all1[k]
             # elif v[2] < .80:
-            #     del all[k]
+            #     del all1[k]
 
-    # print(len(all))
+    # print(len(all1))
 
     seg0 = cv2.cvtColor(seg0, cv2.COLOR_GRAY2BGR)
 
@@ -475,7 +523,7 @@ def find_holes(image):  # , image_center, seg_func, hough_threshold, hough_min_l
     global f_perform_filter
     # print(f_perform_filter)
     if f_perform_filter:
-        circles = [{k: v for k, v in all.items() if v[2] > .9}]
+        circles = [{k: v for k, v in all1.items() if v[2] > .9}]
         # print(circles)
 
         draw_circles2(seg0, circles, t)
