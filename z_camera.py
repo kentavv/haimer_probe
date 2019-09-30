@@ -495,6 +495,8 @@ def process_key(key):
                 print('Wrote images {} and {}'.format(fn1, fn2))
                 break
     elif key == ord('a'):
+        global mouse_sqr_pts, mouse_sqr_pts_done
+
         get_measurement.mouse_op = 'alignment'
         get_measurement.c_view = 1
         mouse_sqr_pts = []
