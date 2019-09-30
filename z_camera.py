@@ -360,15 +360,29 @@ def draw_selected_points(img, pts, c = (255, 64, 32), t = 3):
     # for i in range(len(pts)):
     #     pt1, pt2 = pts[i], pts[(i + 1) % len(pts)]
     #     cv2.line(img, pt1, pt2, c, thickness=t, lineType=cv2.LINE_AA)
-    for pt in pts:
-        c = (0, 0, 255)
-        t = 1
-        off = 10
+
+    c = (0, 0, 255)
+    t = 1
+    off = 10
+
+    for pt in pts[:-1]:
+        cv2.line(img, (pt[0]-off, pt[1]), (pt[0]+off, pt[1]), c, thickness=t, lineType=cv2.LINE_AA)
+        cv2.line(img, (pt[0], pt[1]-off), (pt[0], pt[1]+off), c, thickness=t, lineType=cv2.LINE_AA)
+
+    if pts:
+        pt = pts[-1]
+        x, y = pt[0], pt[1]
+        off2 = 30
+        if off2*2 < x < img.shape[1]-off2*2 and off2*2 < y < img.shape[0]-off2*2:
+            sub = img[y-off2//2:y+off2//2, x-off2//2:x+off2//2, :]
+            enlarged = cv2.resize(sub, (off2*4, off2*4))
+            img[y-off2*2:y+off2*2, x-off2*2:x+off2*2, :] = enlarged
+
         cv2.line(img, (pt[0]-off, pt[1]), (pt[0]+off, pt[1]), c, thickness=t, lineType=cv2.LINE_AA)
         cv2.line(img, (pt[0], pt[1]-off), (pt[0], pt[1]+off), c, thickness=t, lineType=cv2.LINE_AA)
 
 
-@static_vars(pause_updates=False, record=False, record_ind=0, mouse_op='alignment', c_view = 3, warp_m = None)
+@static_vars(pause_updates=False, record=False, record_ind=0, mouse_op='', c_view = 3, warp_m = None)
 def get_measurement(video_capture):
     image0 = next_frame(video_capture)
 
@@ -400,7 +414,7 @@ def get_measurement(video_capture):
         final_img = image_b
 
     global mouse_sqr_pts_done, mouse_sqr_pts
-    if not mouse_sqr_pts_done:
+    if not mouse_sqr_pts_done and get_measurement.mouse_op == 'alignment':
         draw_selected_points(final_img, mouse_sqr_pts)
 
     if error_str:
@@ -447,6 +461,7 @@ def get_measurement(video_capture):
                 mouse_sqr_pts_done = False
 
                 get_measurement.c_view = 3
+                get_measurement.mouse_op = ''
 
         if get_measurement.c_view not in [1, 2]:
             mouse_pts = []
@@ -514,6 +529,9 @@ def click_and_crop(event, x, y, flags, param):
     global mouse_sqr_pts
     global mouse_sqr_pts_done
 
+    # x -= 5
+    # y -= 5
+
     if event == cv2.EVENT_LBUTTONDOWN:
         mouse_pts = [(x, y), None]
         mouse_sqr_pts += [(x, y)]
@@ -521,7 +539,11 @@ def click_and_crop(event, x, y, flags, param):
             mouse_sqr_pts += [(x, y)]
 
     elif event == cv2.EVENT_MOUSEMOVE:
-        if len(mouse_pts) == 2:
+        if len(mouse_sqr_pts) == 0:
+            mouse_sqr_pts += [(x, y)]
+        elif len(mouse_sqr_pts) == 1:
+            mouse_sqr_pts[0] = (x, y)
+        elif len(mouse_pts) == 2:
             mouse_pts[1] = (x, y)
             mouse_moving = True
             if mouse_sqr_pts:
