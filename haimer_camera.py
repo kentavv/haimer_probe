@@ -600,11 +600,11 @@ def get_measurement(video_capture):
     img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
     if get_measurement.record:
-        fn1 = 'mov_raw_{:06}.ppm'.format(get_measurement.record_ind)
+        fn1 = 'mov_raw_h_{:06}.ppm'.format(get_measurement.record_ind)
         cv2.imwrite(fn1, image0)
-        fn2 = 'mov_all_{:06}.ppm'.format(get_measurement.record_ind)
+        fn2 = 'mov_all_h_{:06}.ppm'.format(get_measurement.record_ind)
         cv2.imwrite(fn2, img_all)
-        fn3 = 'mov_fin_{:06}.ppm'.format(get_measurement.record_ind)
+        fn3 = 'mov_fin_h_{:06}.ppm'.format(get_measurement.record_ind)
         cv2.imwrite(fn3, image2)
         get_measurement.record_ind += 1
         print('Recorded {} {}'.format(fn1, fn2))
@@ -621,12 +621,12 @@ def process_key(key):
         get_measurement.record = not get_measurement.record
     elif key == ord('s'):
         for i in range(100):
-            # fn1 = f'raw_{i:03}.png'
-            fn1 = 'raw_{:03}.png'.format(i)
+            # fn1 = f'raw_h_{i:03}.png'
+            fn1 = 'raw_h_{:03}.png'.format(i)
             if not os.path.exists(fn1):
                 cv2.imwrite(fn1, image0)
-                # fn2 = f'all_{i:03}.png'
-                fn2 = 'all_{:03}.png'.format(i)
+                # fn2 = f'all_h_{i:03}.png'
+                fn2 = 'all_h_{:03}.png'.format(i)
                 cv2.imwrite(fn2, img_all)
                 # print(f'Wrote images {fn1} and {fn2}')
                 print('Wrote images {} and {}'.format(fn1, fn2))

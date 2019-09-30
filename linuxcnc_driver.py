@@ -542,17 +542,23 @@ def main():
     while True:
         try:
             mm_final = haimer_camera.get_measurement(video_capture)
-            z_camera.get_measurement(video_capture2)
+            circles = z_camera.get_measurement(video_capture2)
             key = cv2.waitKey(5)
 
-            if not haimer_camera.process_key(key):
-                z_camera.process_key(key)
+            accepted = haimer_camera.process_key(key)
+            if not accepted or key in [ord('r'), ord('s')]:
+                accepted = z_camera.process_key(key)
 
             try:
                 res = cmds[key](video_capture)
                 print(res)
             except KeyError:
                 pass
+
+            if key == ord('l'):
+                for c in circles:
+                    print(c)
+                print
         except OvershootException as e:
             cnc_c.abort()
             haimer_camera.display_error(str(e))

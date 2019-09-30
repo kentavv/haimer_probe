@@ -255,6 +255,7 @@ def find_holes(image):
     keypoints = detector.detect(gray)
 
     def draw_circles(img, keypoints):
+        lst = []
         global c_crop_rect, c_machine_rect
         if keypoints:
             for kp in keypoints:
@@ -267,10 +268,11 @@ def find_holes(image):
                 sz = kp.size/2
                 x = int(round(pt[0] + sz))
                 y = int(round(pt[1] + sz))
-   
+  
                 if c_crop_rect is None or c_machine_rect is None:
                     a = (sz / 2) ** 2 * math.pi
                     cv2.putText(img, '{:.1f} {:.1f}'.format(kp.size, a), (x, y + 20 * 1), c_label_font, c_label_s, c_label_color)
+                    mx, my, diam, mw, mh, w, h = None, None, None, None, None, None, None
                 else:
                     pt0 = c_crop_rect[0]
                     mpt0 = c_machine_rect[0]
@@ -286,10 +288,14 @@ def find_holes(image):
 
                     cv2.putText(img, '{:.3f} {:.3f} {:.3f}'.format(mx, my, diam), (x, y + 20 * 1), c_label_font, c_label_s, c_label_color)
 
-    # image = cv2.drawKeypoints(image, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-    draw_circles(image, keypoints)
+                lst += [((mx, my), diam, (kp.pt[0], kp.pt[1]), kp.size, (mw, mh), (w, h))]
 
-    return image
+        return lst
+
+    # image = cv2.drawKeypoints(image, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+    circles = draw_circles(image, keypoints)
+
+    return image, circles
 
 
 def draw_labels(image, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final):
@@ -373,7 +379,7 @@ def get_measurement(video_capture):
     else:
         image1 = image0.copy()
 
-    image_b = find_holes(image1)
+    image_b, circles = find_holes(image1)
 
     global c_crop_rect
     # cv2.rectangle(image1, c_crop_rect[0], c_crop_rect[1], c_line_color, c_line_s)
@@ -405,11 +411,11 @@ def get_measurement(video_capture):
         cv2.putText(final_img, 'WARNING: ' + error_str, (200, final_img.shape[0] // 2 - 20), c_label_font_error, c_label_s_error, c_label_color_error, 3)
 
     if get_measurement.record:
-        fn1 = 'mov_raw_{:06}.ppm'.format(get_measurement.record_ind)
+        fn1 = 'mov_raw_z_{:06}.ppm'.format(get_measurement.record_ind)
         cv2.imwrite(fn1, image0)
-        # fn2 = 'mov_all_{:06}.ppm'.format(get_measurement.record_ind)
+        # fn2 = 'mov_all_z_{:06}.ppm'.format(get_measurement.record_ind)
         # cv2.imwrite(fn2, img_all)
-        fn3 = 'mov_fin_{:06}.ppm'.format(get_measurement.record_ind)
+        fn3 = 'mov_fin_z_{:06}.ppm'.format(get_measurement.record_ind)
         cv2.imwrite(fn3, final_img)
         get_measurement.record_ind += 1
         print('Recorded {} {}'.format(fn1, fn3))
@@ -451,20 +457,24 @@ def get_measurement(video_capture):
     if not get_measurement.pause_updates:
         cv2.imshow(c_camera_name, final_img)
 
+    return circles
+
 
 def process_key(key):
     if key == ord('p'):
+        get_measurement.pause_updates = not get_measurement.pause_updates
+    elif key == ord('l'):
         get_measurement.pause_updates = not get_measurement.pause_updates
     elif key == ord('r'):
         get_measurement.record = not get_measurement.record
     elif key == ord('s'):
         for i in range(100):
-            # fn1 = f'raw_{i:03}.png'
-            fn1 = 'raw_{:03}.png'.format(i)
+            # fn1 = f'raw_z_{i:03}.png'
+            fn1 = 'raw_z_{:03}.png'.format(i)
             if not os.path.exists(fn1):
                 cv2.imwrite(fn1, image0)
-                # fn2 = f'all_{i:03}.png'
-                fn2 = 'all_{:03}.png'.format(i)
+                # fn2 = f'all_z_{i:03}.png'
+                fn2 = 'all_z_{:03}.png'.format(i)
                 cv2.imwrite(fn2, img_all)
                 # print(f'Wrote images {fn1} and {fn2}')
                 print('Wrote images {} and {}'.format(fn1, fn2))
@@ -555,9 +565,13 @@ def main():
 
     while True:
         try:
-            get_measurement(video_capture)
+            circles = get_measurement(video_capture)
             key = cv2.waitKey(5) & 0xff
             process_key(key)
+            if key == ord('l'):
+                for c in circles:
+                    print(c)
+                print
         except QuitException:
             break
 
