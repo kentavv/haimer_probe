@@ -319,7 +319,7 @@ def draw_fps(image):
     fps = np.mean(draw_fps.fps_lst)
 
     # cv2.putText(image, f'{fps:.2f} fps', (20, 30 * 2), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image, '{:.2f} fps'.format(fps), (20, 30 * 2), c_label_font, c_label_s, c_label_color)
+    cv2.putText(image, '{:.2f} fps'.format(fps), (20, 30 * 3), c_label_font, c_label_s, c_label_color)
 
 
 error_str = None
@@ -336,7 +336,8 @@ def next_frame(video_capture, debug=True):
         retval, image0 = video_capture.read()
     else:
         for _ in range(2):
-            fn = 'tests/downward_facing_camera/1280x720/mov_raw_{:06d}.ppm'.format(next_frame.ind)
+            # fn = 'tests/downward_facing_camera/1280x720/mov_raw_{:06d}.ppm'.format(next_frame.ind)
+            fn = 'tests/downward_facing_camera/1280x720/mov_raw_{:06d}b.ppm'.format(0)
             if os.path.exists(fn):
                 break
             next_frame.ind = 0
@@ -434,6 +435,8 @@ def get_measurement(video_capture):
         get_measurement.record_ind += 1
         print('Recorded {} {}'.format(fn1, fn3))
 
+    global in_alignment
+
     if not get_measurement.pause_updates:
         if get_measurement.mouse_op == 'alignment' and get_measurement.c_view == 1:
             if mouse_sqr_pts_done:
@@ -463,10 +466,19 @@ def get_measurement(video_capture):
                 get_measurement.c_view = 3
                 get_measurement.mouse_op = ''
 
+                in_alignment = True
+
         if get_measurement.c_view not in [1, 2]:
             mouse_pts = []
             mouse_moving = False
 
+    if in_alignment:
+        global ss
+        cv2.putText(final_img, 'Enter plate dimensions (W,H): ', (20, 30), c_label_font, c_label_s, c_label_color)
+        cv2.putText(final_img, process_key.plate_size_str, (20, 30 * 2), c_label_font, c_label_s, c_label_color)
+    else:
+        cv2.putText(final_img, 'Size (WxH): {:.3f} x {:.3f}'.format(*c_machine_rect[1]), (20, 30), c_label_font, c_label_s, c_label_color)
+        
     draw_fps(final_img)
 
     if not get_measurement.pause_updates:
@@ -475,7 +487,41 @@ def get_measurement(video_capture):
     return circles
 
 
+in_alignment = False
+
+@static_vars(plate_size_str = '')
 def process_key(key):
+    global in_alignment, c_machine_rect
+    global mouse_sqr_pts, mouse_sqr_pts_done
+
+    if in_alignment:
+        if key == ord('a'):
+            mouse_sqr_pts = []
+            mouse_sqr_pts_done = False
+        elif key in [ord(x) for x in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', ',']]:
+            process_key.plate_size_str += chr(key)
+        elif key == ord('\r'):
+            print('Parsing:', process_key.plate_size_str)
+            in_alignment = False
+            try:
+                process_key.plate_size = [float(x) for x in process_key.plate_size_str.split(',')]
+            except ValueError:
+                pass
+            else:
+                if len(process_key.plate_size) == 2:
+                    c_machine_rect[1] = process_key.plate_size
+                    print(c_machine_rect)
+            
+            process_key.plate_size_str = ''
+        elif key == 8: # backspace
+            process_key.plate_size_str = process_key.plate_size_str[:-1]
+        elif key == 255:
+            pass
+        else:
+            return False
+
+        return True
+
     if key == ord('p'):
         get_measurement.pause_updates = not get_measurement.pause_updates
     elif key == ord('l'):
@@ -495,8 +541,6 @@ def process_key(key):
                 print('Wrote images {} and {}'.format(fn1, fn2))
                 break
     elif key == ord('a'):
-        global mouse_sqr_pts, mouse_sqr_pts_done
-
         get_measurement.mouse_op = 'alignment'
         get_measurement.c_view = 1
         mouse_sqr_pts = []
@@ -513,8 +557,8 @@ def process_key(key):
         get_measurement.c_view = 3
     elif key == ord('q'):
         raise QuitException
-    elif key >= 0:
-        # print(key)
+    elif key != 255:
+        print(key)
         return False
 
     return True
