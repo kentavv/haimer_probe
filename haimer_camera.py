@@ -614,6 +614,7 @@ def get_measurement(video_capture):
 
     return mm_final
 
+
 def process_key(key):
     if key == ord('p'):
         get_measurement.pause_updates = not get_measurement.pause_updates

@@ -46,7 +46,6 @@ import sys
 import time
 
 import cv2
-
 import linuxcnc
 
 import haimer_camera

@@ -260,15 +260,15 @@ def find_holes(image):
         if keypoints:
             for kp in keypoints:
                 pt = (int(round(kp.pt[0])), int(round(kp.pt[1])))
-                sz = int(round(kp.size/2))
+                sz = int(round(kp.size / 2))
                 cv2.circle(img, pt, sz, (0, 255, 0), 2)
                 cv2.circle(img, pt, 2, (0, 0, 255), 3)
 
                 pt = kp.pt
-                sz = kp.size/2
+                sz = kp.size / 2
                 x = int(round(pt[0] + sz))
                 y = int(round(pt[1] + sz))
-  
+
                 if c_crop_rect is None or c_machine_rect is None:
                     a = (sz / 2) ** 2 * math.pi
                     cv2.putText(img, '{:.1f} {:.1f}'.format(kp.size, a), (x, y + 20 * 1), c_label_font, c_label_s, c_label_color)
@@ -358,7 +358,7 @@ def next_frame(video_capture, debug=True):
     return image0
 
 
-def draw_selected_points(img, pts, c = (255, 64, 32), t = 3):
+def draw_selected_points(img, pts, c=(255, 64, 32), t=3):
     # for i in range(len(pts)):
     #     pt1, pt2 = pts[i], pts[(i + 1) % len(pts)]
     #     cv2.line(img, pt1, pt2, c, thickness=t, lineType=cv2.LINE_AA)
@@ -368,29 +368,29 @@ def draw_selected_points(img, pts, c = (255, 64, 32), t = 3):
     off = 10
 
     for pt in pts[:-1]:
-        cv2.line(img, (pt[0]-off, pt[1]), (pt[0]+off, pt[1]), c, thickness=t, lineType=cv2.LINE_AA)
-        cv2.line(img, (pt[0], pt[1]-off), (pt[0], pt[1]+off), c, thickness=t, lineType=cv2.LINE_AA)
+        cv2.line(img, (pt[0] - off, pt[1]), (pt[0] + off, pt[1]), c, thickness=t, lineType=cv2.LINE_AA)
+        cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=t, lineType=cv2.LINE_AA)
 
     if pts:
         pt = pts[-1]
         x, y = pt[0], pt[1]
         off2 = 30
-        if off2*2 < x < img.shape[1]-off2*2 and off2*2 < y < img.shape[0]-off2*2:
-            sub = img[y-off2//2:y+off2//2, x-off2//2:x+off2//2, :]
-            enlarged = cv2.resize(sub, (off2*4, off2*4))
-            img[y-off2*2:y+off2*2, x-off2*2:x+off2*2, :] = enlarged
+        if off2 * 2 < x < img.shape[1] - off2 * 2 and off2 * 2 < y < img.shape[0] - off2 * 2:
+            sub = img[y - off2 // 2:y + off2 // 2, x - off2 // 2:x + off2 // 2, :]
+            enlarged = cv2.resize(sub, (off2 * 4, off2 * 4))
+            img[y - off2 * 2:y + off2 * 2, x - off2 * 2:x + off2 * 2, :] = enlarged
 
-        cv2.line(img, (pt[0]-off, pt[1]), (pt[0]+off, pt[1]), c, thickness=t, lineType=cv2.LINE_AA)
-        cv2.line(img, (pt[0], pt[1]-off), (pt[0], pt[1]+off), c, thickness=t, lineType=cv2.LINE_AA)
+        cv2.line(img, (pt[0] - off, pt[1]), (pt[0] + off, pt[1]), c, thickness=t, lineType=cv2.LINE_AA)
+        cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=t, lineType=cv2.LINE_AA)
 
 
-@static_vars(pause_updates=False, record=False, record_ind=0, mouse_op='', c_view = 3, warp_m = None)
+@static_vars(pause_updates=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None)
 def get_measurement(video_capture):
     image0 = next_frame(video_capture)
 
     if get_measurement.warp_m is not None:
         h, w = image0.shape[:2]
-	warped = cv2.warpPerspective(image0, get_measurement.warp_m, (w, h)) 
+        warped = cv2.warpPerspective(image0, get_measurement.warp_m, (w, h))
         image1 = warped
     else:
         image1 = image0.copy()
@@ -442,18 +442,18 @@ def get_measurement(video_capture):
         if get_measurement.mouse_op == 'alignment' and get_measurement.c_view == 1:
             if mouse_sqr_pts_done:
                 # draw_selected_points(final_img, mouse_sqr_pts)
-       
-                rct = np.array(mouse_sqr_pts, dtype = np.float32)
+
+                rct = np.array(mouse_sqr_pts, dtype=np.float32)
                 w1 = line_length(mouse_sqr_pts[0], mouse_sqr_pts[1])
                 w2 = line_length(mouse_sqr_pts[2], mouse_sqr_pts[3])
                 h1 = line_length(mouse_sqr_pts[0], mouse_sqr_pts[3])
                 h2 = line_length(mouse_sqr_pts[1], mouse_sqr_pts[2])
                 w = max(w1, w2)
                 h = max(h1, h2)
-    
+
                 pt1 = mouse_sqr_pts[0]
                 dst0 = [pt1, [pt1[0] + w, pt1[1]], [pt1[0] + w, pt1[1] + h], [pt1[0], pt1[1] + h]]
-                dst = np.array(dst0, dtype = np.float32)
+                dst = np.array(dst0, dtype=np.float32)
 
                 get_measurement.warp_m = cv2.getPerspectiveTransform(rct, dst)
 
@@ -479,7 +479,7 @@ def get_measurement(video_capture):
         cv2.putText(final_img, process_key.plate_size_str, (20, 30 * 2), c_label_font, c_label_s, c_label_color)
     else:
         cv2.putText(final_img, 'Size (WxH): {:.3f} x {:.3f}'.format(*c_machine_rect[1]), (20, 30), c_label_font, c_label_s, c_label_color)
-        
+
     draw_fps(final_img)
 
     if not get_measurement.pause_updates:
@@ -490,7 +490,8 @@ def get_measurement(video_capture):
 
 in_alignment = False
 
-@static_vars(plate_size_str = '')
+
+@static_vars(plate_size_str='')
 def process_key(key):
     global in_alignment, c_machine_rect
     global mouse_sqr_pts, mouse_sqr_pts_done
@@ -512,9 +513,9 @@ def process_key(key):
                 if len(process_key.plate_size) == 2:
                     c_machine_rect[1] = process_key.plate_size
                     print(c_machine_rect)
-            
+
             process_key.plate_size_str = ''
-        elif key == 8: # backspace
+        elif key == 8:  # backspace
             process_key.plate_size_str = process_key.plate_size_str[:-1]
         elif key == 255:
             pass
