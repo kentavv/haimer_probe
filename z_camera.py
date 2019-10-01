@@ -336,8 +336,9 @@ def next_frame(video_capture, debug=True):
         retval, image0 = video_capture.read()
     else:
         for _ in range(2):
-            # fn = 'tests/downward_facing_camera/1280x720/mov_raw_{:06d}.ppm'.format(next_frame.ind)
-            fn = 'tests/downward_facing_camera/1280x720/mov_raw_{:06d}b.ppm'.format(0)
+            # fn = 'tests/z_camera/1280x720/mov_raw_{:06d}.ppm'.format(next_frame.ind)
+            # fn = 'tests/z_camera/1280x720/holes.png'
+            fn = 'tests/z_camera/1280x720/holes_and_slots.png'
             if os.path.exists(fn):
                 break
             next_frame.ind = 0
