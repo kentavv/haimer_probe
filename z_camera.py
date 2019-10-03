@@ -384,7 +384,7 @@ def draw_selected_points(img, pts, c=(255, 64, 32), t=3):
         cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=t, lineType=cv2.LINE_AA)
 
 
-@static_vars(pause_updates=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None)
+@static_vars(pause_updates=False, record=False, save=False, record_ind=0, mouse_op='', c_view=3, warp_m=None)
 def get_measurement(video_capture):
     image0 = next_frame(video_capture)
 
@@ -435,6 +435,21 @@ def get_measurement(video_capture):
         cv2.imwrite(fn3, final_img)
         get_measurement.record_ind += 1
         print('Recorded {} {}'.format(fn1, fn3))
+
+    if get_measurement.save:
+        get_measurement.save = False
+
+        for i in range(100):
+            # fn1 = f'raw_z_{i:03}.png'
+            fn1 = 'raw_z_{:03}.png'.format(i)
+            if not os.path.exists(fn1):
+                cv2.imwrite(fn1, image0)
+                # fn2 = f'all_z_{i:03}.png'
+                fn2 = 'all_z_{:03}.png'.format(i)
+                cv2.imwrite(fn2, final_img)
+                # print(f'Wrote images {fn1} and {fn2}')
+                print('Wrote images {} and {}'.format(fn1, fn2))
+                break
 
     global in_alignment
 
@@ -531,17 +546,7 @@ def process_key(key):
     elif key == ord('r'):
         get_measurement.record = not get_measurement.record
     elif key == ord('s'):
-        for i in range(100):
-            # fn1 = f'raw_z_{i:03}.png'
-            fn1 = 'raw_z_{:03}.png'.format(i)
-            if not os.path.exists(fn1):
-                cv2.imwrite(fn1, image0)
-                # fn2 = f'all_z_{i:03}.png'
-                fn2 = 'all_z_{:03}.png'.format(i)
-                cv2.imwrite(fn2, img_all)
-                # print(f'Wrote images {fn1} and {fn2}')
-                print('Wrote images {} and {}'.format(fn1, fn2))
-                break
+        get_measurement.save = True
     elif key == ord('a'):
         get_measurement.mouse_op = 'alignment'
         get_measurement.c_view = 1
