@@ -513,7 +513,7 @@ def display_error(s):
     _error_str = s
 
 
-@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, record=False, record_ind=0)
+@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, save=False, record=False, record_ind=0)
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
 
@@ -609,6 +609,21 @@ def get_measurement(video_capture):
         get_measurement.record_ind += 1
         print('Recorded {} {}'.format(fn1, fn2))
 
+    if get_measurement.save:
+        get_measurement.save = False
+
+        for i in range(100):
+            # fn1 = f'raw_h_{i:03}.png'
+            fn1 = 'raw_h_{:03}.png'.format(i)
+            if not os.path.exists(fn1):
+                cv2.imwrite(fn1, image0)
+                # fn2 = f'all_h_{i:03}.png'
+                fn2 = 'all_h_{:03}.png'.format(i)
+                cv2.imwrite(fn2, img_all)
+                # print(f'Wrote images {fn1} and {fn2}')
+                print('Wrote images {} and {}'.format(fn1, fn2))
+                break
+
     if not get_measurement.pause_updates:
         cv2.imshow(c_camera_name, img_all_resized)
 
@@ -621,17 +636,7 @@ def process_key(key):
     elif key == ord('r'):
         get_measurement.record = not get_measurement.record
     elif key == ord('s'):
-        for i in range(100):
-            # fn1 = f'raw_h_{i:03}.png'
-            fn1 = 'raw_h_{:03}.png'.format(i)
-            if not os.path.exists(fn1):
-                cv2.imwrite(fn1, image0)
-                # fn2 = f'all_h_{i:03}.png'
-                fn2 = 'all_h_{:03}.png'.format(i)
-                cv2.imwrite(fn2, img_all)
-                # print(f'Wrote images {fn1} and {fn2}')
-                print('Wrote images {} and {}'.format(fn1, fn2))
-                break
+        get_measurement.save = True
     elif key == ord('t'):
         if calc_mm.tare_on:
             calc_mm.tare_lst = []

@@ -384,7 +384,7 @@ def draw_selected_points(img, pts, c=(255, 64, 32), t=3):
         cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=t, lineType=cv2.LINE_AA)
 
 
-@static_vars(pause_updates=False, record=False, save=False, record_ind=0, mouse_op='', c_view=3, warp_m=None)
+@static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None)
 def get_measurement(video_capture):
     image0 = next_frame(video_capture)
 
