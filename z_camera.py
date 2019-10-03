@@ -331,8 +331,8 @@ def display_error(s):
 
 
 @static_vars(ind=0)
-def next_frame(video_capture, debug=True):
-    if not debug:
+def next_frame(video_capture):
+    if not c_demo_mode:
         retval, image0 = video_capture.read()
     else:
         for _ in range(2):
@@ -346,14 +346,14 @@ def next_frame(video_capture, debug=True):
         retval, image0 = 1, cv2.imread(fn, -1)
         next_frame.ind += 1
 
+        image0 = cv2.rotate(image0, cv2.ROTATE_180)
+
     if not retval:
         print('rv is false')
         sys.exit(1)
     if image0.size == 0:
         print('image0 is empty')
         sys.exit(1)
-
-    image0 = cv2.rotate(image0, cv2.ROTATE_180)
 
     return image0
 
