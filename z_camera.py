@@ -605,6 +605,8 @@ def process_key(key):
             process_key.plate_size_str = ''
         elif key == 8:  # backspace
             process_key.plate_size_str = process_key.plate_size_str[:-1]
+        elif key == ord('q'):
+            raise QuitException
         elif key == 255:
             pass
         else:
