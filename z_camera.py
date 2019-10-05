@@ -150,8 +150,11 @@ def plate_mask(image):
     if c_crop_rect is None:
         mask = np.ones(image.shape, dtype=image.dtype) * 255
     else:
+        off = 10
+        pt1, pt2 = c_crop_rect
+        pt1b, pt2b = [(int(round(pt1[0] - off)), int(round(pt1[1] - off))), (int(round(pt2[0] + off)), int(round(pt2[1] + off)))]
         mask = np.zeros(image.shape, dtype=image.dtype)
-        cv2.rectangle(mask, c_crop_rect[0], c_crop_rect[1], (255, 255, 255), -1)
+        cv2.rectangle(mask, pt1b, pt2b, (255, 255, 255), -1)
 
     return mask
 
@@ -380,7 +383,10 @@ def get_measurement(video_capture):
     draw_circles(image_b, circles)
 
     global c_crop_rect
-    # cv2.rectangle(image1, c_crop_rect[0], c_crop_rect[1], c_line_color, c_line_s)
+    if c_crop_rect:
+        def round_pt(pt):
+            return tuple([int(round(x)) for x in pt])
+        cv2.rectangle(image_b, round_pt(c_crop_rect[0]), round_pt(c_crop_rect[1]), c_line_color, c_line_s)
 
     global c_view
 
@@ -455,8 +461,7 @@ def get_measurement(video_capture):
                 get_measurement.warp_m = cv2.getPerspectiveTransform(rct, dst)
 
                 pt1, pt2 = dst0[0], dst0[2]
-                off = 10
-                c_crop_rect = [(int(round(pt1[0] - off)), int(round(pt1[1] - off))), (int(round(pt2[0] + off)), int(round(pt2[1] + off)))]
+                c_crop_rect = [pt1, pt2]
 
                 mouse_sqr_pts = []
                 mouse_sqr_pts_done = False
