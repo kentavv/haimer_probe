@@ -52,9 +52,9 @@ c_haimer_ball_diam = 4.  # millimeters
 
 c_dial_outer_mask_r = 220
 
-c_red_angle_start = 1.9183842044515955
-c_red_angle_end = -1.8894180264975993 + 2 * math.pi
-c_initial_image_rot = -.07275208078176175254 + 0.002881063774711395
+c_red_angle_start = 1.9170124625343092
+c_red_angle_end = c_red_angle_start + 2.5120631002707458 # = -1.8894180264975993 + 2 * math.pi - c_red_angle_start
+c_initial_image_rot = -.07513945576152618354
 
 c_rho_resolution = 1 / 2.  # 1/2 pixel
 c_theta_resolution = np.pi / 180 / 4.  # 1/4 degree
@@ -82,7 +82,7 @@ c_label_s = .8
 c_line_color = (0, 200, 0)
 c_line_s = 2
 
-c_center_offset = [12, 3]
+c_center_offset = [18, -6]
 c_image_center = lambda w, h: (w // 2 + c_center_offset[0], h // 2 + c_center_offset[1])
 
 
@@ -513,7 +513,7 @@ def display_error(s):
     _error_str = s
 
 
-@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, save=False, record=False, record_ind=0)
+@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, save=False, record=False, record_ind=0, debug_view=False)
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
 
@@ -599,6 +599,15 @@ def get_measurement(video_capture):
         cv2.putText(img_all, 'WARNING: ' + _error_str, (200, img_all.shape[0] // 2 - 20), c_label_font_error, c_label_s_error, c_label_color_error, 3)
     img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
+    img_b = cv2.resize(image_b, None, fx=0.5, fy=0.5)
+    img_r = cv2.resize(image_r, (image2.shape[1] - img_b.shape[1], image2.shape[0] - img_b.shape[0]))
+    img_simple = np.vstack([image2, np.hstack([img_b, img_r])])
+
+    if get_measurement.debug_view:
+        final_img = img_all_resized
+    else:
+        final_img = img_simple
+
     if get_measurement.record:
         fn1 = 'mov_raw_h_{:06}.ppm'.format(get_measurement.record_ind)
         cv2.imwrite(fn1, image0)
@@ -606,8 +615,10 @@ def get_measurement(video_capture):
         cv2.imwrite(fn2, img_all)
         fn3 = 'mov_fin_h_{:06}.ppm'.format(get_measurement.record_ind)
         cv2.imwrite(fn3, image2)
+        fn4 = 'mov_sim_h_{:06}.ppm'.format(get_measurement.record_ind)
+        cv2.imwrite(fn4, img_simple)
         get_measurement.record_ind += 1
-        print('Recorded {} {}'.format(fn1, fn2))
+        print('Recorded {} {} {} {}'.format(fn1, fn2, fn3, fn4))
 
     if get_measurement.save:
         get_measurement.save = False
@@ -620,12 +631,14 @@ def get_measurement(video_capture):
                 # fn2 = f'all_h_{i:03}.png'
                 fn2 = 'all_h_{:03}.png'.format(i)
                 cv2.imwrite(fn2, img_all)
+                fn3 = 'sim_h_{:03}.png'.format(i)
+                cv2.imwrite(fn3, img_simple)
                 # print(f'Wrote images {fn1} and {fn2}')
-                print('Wrote images {} and {}'.format(fn1, fn2))
+                print('Wrote images {} {} {}'.format(fn1, fn2, fn3))
                 break
 
     if not get_measurement.pause_updates:
-        cv2.imshow(c_camera_name, img_all_resized)
+        cv2.imshow(c_camera_name, final_img)
 
     return mm_final
 
@@ -637,6 +650,8 @@ def process_key(key):
         get_measurement.record = not get_measurement.record
     elif key == ord('s'):
         get_measurement.save = True
+    elif key == ord('d'):
+        get_measurement.debug_view = not get_measurement.debug_view
     elif key == ord('t'):
         if calc_mm.tare_on:
             calc_mm.tare_lst = []

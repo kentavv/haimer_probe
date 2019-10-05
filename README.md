@@ -11,7 +11,8 @@ Examples of use are shown at: https://www.youtube.com/watch?v=w3novypPqos
 * p: toggle display updates, image analysis continues
 * r: toggle recording raw and displayed frames (overwriting)
 * s: save current raw and displayed frames (non-overwriting)
-* t: enable tare calculations
+* t: toggle tare calculations
+* d: toggle debug view stages of image analysis
 * q: quit
 * KEY_LEFT: move pivot point to the left
 * KEY_UP: move pivot point up
