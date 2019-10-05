@@ -591,12 +591,6 @@ def get_measurement(video_capture):
     img_all1 = np.vstack([seg_b, skel_b, image_b])
     img_all2 = np.vstack([seg_r, skel_r, image_r])
     img_all = np.hstack([img_all0, img_all1, img_all2])
-    if _error_str:
-        print(_error_str)
-        c_label_font_error = cv2.FONT_HERSHEY_SIMPLEX
-        c_label_color_error = (0, 0, 255)
-        c_label_s_error = 1.5
-        cv2.putText(img_all, 'WARNING: ' + _error_str, (200, img_all.shape[0] // 2 - 20), c_label_font_error, c_label_s_error, c_label_color_error, 3)
     img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
     img_b = cv2.resize(image_b, None, fx=0.5, fy=0.5)
@@ -607,6 +601,19 @@ def get_measurement(video_capture):
         final_img = img_all_resized
     else:
         final_img = img_simple
+
+    if _error_str:
+        s = 'WARNING: ' + _error_str
+
+        c_label_font_error = cv2.FONT_HERSHEY_SIMPLEX
+        c_label_color_error = (0, 0, 255)
+        c_label_s_error = 1.5
+
+        thickness = 3
+        text_size, baseline = cv2.getTextSize(s, c_label_font_error, c_label_s_error, thickness)
+
+        text_pos = ((final_img.shape[1] - text_size[0]) // 2, (final_img.shape[0] + text_size[1]) // 2)
+        cv2.putText(final_img, s, text_pos, c_label_font_error, c_label_s_error, c_label_color_error, thickness)
 
     if get_measurement.record:
         fn1 = 'mov_raw_h_{:06}.ppm'.format(get_measurement.record_ind)
