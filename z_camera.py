@@ -582,8 +582,12 @@ def process_key(key):
 
     if in_alignment:
         if key == ord('a'):
+            get_measurement.mouse_op = 'alignment'
+            get_measurement.c_view = 1
             mouse_sqr_pts = []
             mouse_sqr_pts_done = False
+            in_alignment = False
+            process_key.plate_size_str = ''
         elif key in [ord(x) for x in ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', ',']]:
             process_key.plate_size_str += chr(key)
         elif key == ord('\r'):
