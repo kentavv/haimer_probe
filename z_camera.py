@@ -47,7 +47,7 @@ c_line_s = 2
 c_crop_rect = None
 c_machine_rect = [[0.0, 0.0], [4.266, 3.0]]
 
-c_demo_mode = False
+c_demo_mode = True
 
 
 class QuitException(Exception):
@@ -140,56 +140,13 @@ def set_camera_properties(video_cap):
             print('Unable to set', nm, v)
 
 
-def filter_lines(lines, image_center, cutoff=5):
-    lines2 = []
-    for lst in lines:
-        x1, y1, x2, y2 = lst[0]
-        x0, y0 = image_center
-
-        # Distance between a point (image center) and a line defined by two
-        # points, as returned from HoughLinesP
-        # https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line
-        d = abs((y2 - y1) * x0 - (x2 - x1) * y0 + x2 * y1 - y2 * x1) / math.sqrt((y2 - y1) ** 2 + (x2 - x1) ** 2)
-
-        lines2 += [[d < cutoff, lst]]
-
-    return lines2
-
-
-def line_angle(pt1, pt2):
-    delta_x = pt2[0] - pt1[0]
-    delta_y = pt2[1] - pt1[1]
-    return math.atan2(delta_y, delta_x)
-
-
 def line_length(pt1, pt2):
     delta_x = pt2[0] - pt1[0]
     delta_y = pt2[1] - pt1[1]
     return math.sqrt(delta_x ** 2 + delta_y ** 2)
 
 
-def summarize_lines(lines, image_center):
-    aa = []
-
-    for lst in lines:
-        inc, (x1, y1, x2, y2) = lst[0], lst[1][0]
-
-        if inc:
-            pt1 = (x1, y1)
-            pt2 = (x2, y2)
-
-            pt0 = image_center
-
-            aa += [line_angle(pt0, pt1), line_angle(pt0, pt2)]
-
-    theta = None
-    if aa:
-        theta = mean_angles(aa)
-
-    return theta
-
-
-def black_arrow_mask(image):
+def plate_mask(image):
     if c_crop_rect is None:
         mask = np.ones(image.shape, dtype=image.dtype) * 255
     else:
@@ -200,7 +157,7 @@ def black_arrow_mask(image):
 
 
 def find_holes(image):
-    mask = black_arrow_mask(image)
+    mask = plate_mask(image)
     gray = cv2.cvtColor(cv2.bitwise_and(mask, image), cv2.COLOR_BGR2GRAY)
     image /= 2
     image[cv2.bitwise_not(mask) == 255] /= 2
@@ -253,58 +210,79 @@ def find_holes(image):
     detector = cv2.SimpleBlobDetector_create(params)
 
     keypoints = detector.detect(gray)
+    # image = cv2.drawKeypoints(image, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
 
-    def draw_circles(img, keypoints):
+    def keypoints_to_circles(keypoints):
+        lst = [((kp.pt[0], kp.pt[1]), kp.size) for kp in keypoints]
+        return lst
+
+    def circles_to_machine_circles(circles):
         lst = []
+
         global c_crop_rect, c_machine_rect
-        if keypoints:
-            for kp in keypoints:
-                pt = (int(round(kp.pt[0])), int(round(kp.pt[1])))
-                sz = int(round(kp.size / 2))
-                cv2.circle(img, pt, sz, (0, 255, 0), 2)
-                cv2.circle(img, pt, 2, (0, 0, 255), 3)
+        if circles and c_crop_rect and c_machine_rect:
+            pt0 = c_crop_rect[0]
+            mpt0 = c_machine_rect[0]
 
-                pt = kp.pt
-                sz = kp.size / 2
-                x = int(round(pt[0] + sz))
-                y = int(round(pt[1] + sz))
+            w = c_crop_rect[1][0] - c_crop_rect[0][0]
+            h = c_crop_rect[1][1] - c_crop_rect[0][1]
+            mw = c_machine_rect[1][0] - c_machine_rect[0][0]
+            mh = c_machine_rect[1][1] - c_machine_rect[0][1]
 
-                if c_crop_rect is None or c_machine_rect is None:
-                    a = (sz / 2) ** 2 * math.pi
-                    cv2.putText(img, '{:.1f} {:.1f}'.format(kp.size, a), (x, y + 20 * 1), c_label_font, c_label_s, c_label_color)
-                    mx, my, diam, mw, mh, w, h = None, None, None, None, None, None, None
-                else:
-                    pt0 = c_crop_rect[0]
-                    mpt0 = c_machine_rect[0]
-                    w = c_crop_rect[1][0] - c_crop_rect[0][0]
-                    h = c_crop_rect[1][1] - c_crop_rect[0][1]
-                    mw = c_machine_rect[1][0] - c_machine_rect[0][0]
-                    mh = c_machine_rect[1][1] - c_machine_rect[0][1]
+            for cir in circles:
+                pt, diam = cir
 
-                    mx = mpt0[0] + ((pt[0] - pt0[0]) / float(w) * mw)
-                    my = mpt0[1] - ((pt[1] - pt0[1]) / float(h) * mh)
+                mx = mpt0[0] + ((pt[0] - pt0[0]) / float(w) * mw)
+                my = mpt0[1] - ((pt[1] - pt0[1]) / float(h) * mh)
+                mdiam = diam / float(w) * mw
 
-                    diam = kp.size / float(w) * mw
-
-                    cv2.putText(img, '{:.3f} {:.3f} {:.3f}'.format(mx, my, diam), (x, y + 20 * 1), c_label_font, c_label_s, c_label_color)
-
-                lst += [((mx, my), diam, (kp.pt[0], kp.pt[1]), kp.size, (mw, mh), (w, h))]
+                lst += [((mx, my), mdiam)]
+        else:
+            lst = [[] for cir in circles]
 
         return lst
 
-    # image = cv2.drawKeypoints(image, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
-    circles = draw_circles(image, keypoints)
+    img_circles = keypoints_to_circles(keypoints)
+    m_circles = circles_to_machine_circles(img_circles)
+    circles = list(zip(img_circles, m_circles))
 
-    return image, circles
+    return circles
 
 
-def draw_labels(image, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final):
-    # cv2.putText(image_b, f'{theta_b:5.2f} rad {mm_b:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
-    # cv2.putText(image_r, f'{theta_r:5.2f} rad {mm_r:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
-    # cv2.putText(image, f'{mm_final:6.3f} mm', (20, 30 * 1), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image_b, '{:5.2f} rad {:6.3f} mm'.format(theta_b, mm_b), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image_r, '{:5.2f} rad {:6.3f} mm'.format(theta_b, mm_b), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image, '{:6.3f} mm'.format(mm_final), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
+def draw_circles(img, circles):
+    for i, cir in enumerate(circles):
+        ((x, y), diam), m_cir = cir
+
+        pt = (int(round(x)), int(round(y)))
+        sz = int(round(diam / 2))
+        cv2.circle(img, pt, sz, (0, 255, 0), 2)
+        cv2.circle(img, pt, 2, (0, 0, 255), 3)
+
+        label = chr(ord('A') + i)
+        tx = int(round(x + diam / 2))
+        ty = int(round(y + diam / 2))
+
+        cv2.putText(img, '{}'.format(label), (tx, ty + 20), c_label_font, c_label_s, c_label_color)
+
+
+def draw_table(img, circles):
+    def h(i):
+        return 20, 130 + i * 25
+
+    cv2.putText(img, '{} {:6s} {:6s} {:6s}'.format('ID', '  X', '  Y', 'diam'), h(-1), c_label_font, c_label_s, c_label_color)
+
+    for i, cir in enumerate(circles):
+        ((x, y), diam), m_cir = cir
+
+        label = chr(ord('A') + i)
+
+        if m_cir:
+            (mx, my), mdiam = m_cir
+            cv2.putText(img, '{} {:.3f} {:.3f} {:.3f}'.format(label, mx, my, mdiam), h(i), c_label_font, c_label_s, c_label_color)
+        else:
+            # a = (diam / 2) ** 2 * math.pi
+            # cv2.putText(img, '{} {:.1f} {:.1f}'.format(label, diam, a), h(i), c_label_font, c_label_s, c_label_color)
+            cv2.putText(img, '{}'.format(label), h(i), c_label_font, c_label_s, c_label_color)
 
 
 @static_vars(fps_lst=[], fps_t1=None)
@@ -319,7 +297,7 @@ def draw_fps(image):
     fps = np.mean(draw_fps.fps_lst)
 
     # cv2.putText(image, f'{fps:.2f} fps', (20, 30 * 2), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image, '{:.2f} fps'.format(fps), (20, 30 * 3), c_label_font, c_label_s, c_label_color)
+    cv2.putText(image, '{:.2f} fps'.format(fps), (20, image.shape[0] - 30), c_label_font, c_label_s, c_label_color)
 
 
 error_str = None
@@ -395,7 +373,11 @@ def get_measurement(video_capture):
     else:
         image1 = image0.copy()
 
-    image_b, circles = find_holes(image1)
+    circles = find_holes(image1)
+
+    image_b = image1.copy()
+    draw_table(image_b, circles)
+    draw_circles(image_b, circles)
 
     global c_crop_rect
     # cv2.rectangle(image1, c_crop_rect[0], c_crop_rect[1], c_line_color, c_line_s)
@@ -490,8 +472,8 @@ def get_measurement(video_capture):
 
     if in_alignment:
         global ss
-        cv2.putText(final_img, 'Enter plate dimensions (W,H): ', (20, 30), c_label_font, c_label_s, c_label_color)
-        cv2.putText(final_img, process_key.plate_size_str, (20, 30 * 2), c_label_font, c_label_s, c_label_color)
+        ss2 = 'Enter plate dimensions (W,H): ' + process_key.plate_size_str
+        cv2.putText(final_img, ss2, (20, 30), c_label_font, c_label_s, c_label_color)
     else:
         cv2.putText(final_img, 'Size (WxH): {:.3f} x {:.3f}'.format(*c_machine_rect[1]), (20, 30), c_label_font, c_label_s, c_label_color)
 
