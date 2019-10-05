@@ -48,7 +48,7 @@ c_line_s = 2
 c_crop_rect = None
 c_machine_rect = [[0.0, 0.0], [4.266, 3.0]]
 
-c_demo_mode = True
+c_demo_mode = False
 
 
 class QuitException(Exception):
@@ -195,10 +195,10 @@ def plate_mask(image):
         mask = np.ones(image.shape, dtype=image.dtype) * 255
     else:
         off = 10
-        pt1, pt2 = c_crop_rect
-        pt1b, pt2b = [(int(round(pt1[0] - off)), int(round(pt1[1] - off))), (int(round(pt2[0] + off)), int(round(pt2[1] + off)))]
+        pt1 = round_pt(add_pts(c_crop_rect[0], (-off, -off)))
+        pt2 = round_pt(add_pts(c_crop_rect[1], (off, off)))
         mask = np.zeros(image.shape, dtype=image.dtype)
-        cv2.rectangle(mask, pt1b, pt2b, (255, 255, 255), -1)
+        cv2.rectangle(mask, pt1, pt2, (255, 255, 255), -1)
 
     return mask
 
@@ -300,16 +300,15 @@ def draw_circles(img, circles):
     for i, cir in enumerate(circles):
         ((x, y), diam), m_cir = cir
 
-        pt = (int(round(x)), int(round(y)))
+        pt = round_pt((x, y))
         sz = int(round(diam / 2))
         cv2.circle(img, pt, sz, (0, 255, 0), 2, lineType=cv2.LINE_AA)
         cv2.circle(img, pt, 2, (0, 0, 255), 3, lineType=cv2.LINE_AA)
 
         label = chr(ord('A') + i)
-        tx = int(round(x + diam / 2))
-        ty = int(round(y + diam / 2))
+        tpt = add_pts(pt, (sz + 1, sz + 1))
 
-        cv2.putText(img, '{}'.format(label), (tx, ty + 20), c_label_font, c_label_s, c_label_color)
+        cv2.putText(img, '{}'.format(label), tpt, c_label_font, c_label_s, c_label_color)
 
 
 def draw_table(img, circles):
@@ -335,6 +334,10 @@ def draw_table(img, circles):
 def round_pt(pt):
     return tuple([int(round(x)) for x in pt])
 
+
+def add_pts(pt1, pt2):
+    return tuple([x + y for x,y in zip(pt1, pt2)])
+ 
 
 def draw_path(img, circles, start_pt, end_pt):
     global c_crop_rect, c_machine_rect
@@ -444,7 +447,7 @@ def draw_selected_points(img, pts, c=(255, 64, 32), t=3):
         cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=t, lineType=cv2.LINE_AA)
 
 
-@static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None)
+@static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(6, 0), end_mpt=(0, 0))
 def get_measurement(video_capture):
     image0 = next_frame(video_capture)
 
@@ -455,16 +458,13 @@ def get_measurement(video_capture):
     else:
         image1 = image0.copy()
 
-    start_mpt = (6, 0)
-    end_mpt = (0, 0)
-
     circles = find_holes(image1)
-    circles = organize_circles(circles, start_mpt, end_mpt)
+    circles = organize_circles(circles, get_measurement.start_mpt, get_measurement.end_mpt)
 
     image_b = image1.copy()
     draw_table(image_b, circles)
     draw_circles(image_b, circles)
-    draw_path(image_b, circles, start_mpt, end_mpt) 
+    draw_path(image_b, circles, get_measurement.start_mpt, get_measurement.end_mpt) 
 
     global c_crop_rect
     if c_crop_rect:
