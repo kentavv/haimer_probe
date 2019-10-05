@@ -42,6 +42,7 @@ c_label_color = (63, 255, 63)
 c_label_s = .8
 
 c_line_color = (0, 200, 0)
+c_path_color = (200, 200, 64)
 c_line_s = 2
 
 c_crop_rect = None
@@ -138,6 +139,49 @@ def set_camera_properties(video_cap):
     for nm, v in capture_properties:
         if not video_cap.set(eval(nm), v):
             print('Unable to set', nm, v)
+
+
+def min_path(lst, start_pt=None, end_pt=None):
+    from itertools import permutations
+
+    m_d = float('inf')
+    m_lst = []
+    for l in permutations(lst):
+        l2 = list(l)
+
+        if start_pt is not None:
+            l2 = [start_pt] + l2
+
+        if end_pt is not None:
+            l2 = l2 + [end_pt]
+
+        d = 0.
+        for pt1, pt2 in zip(l2, l2[1:]):
+            d += (pt1[0] - pt2[0]) ** 2 + (pt1[1] - pt2[1]) ** 2
+
+        if m_d > d:
+            m_d = d
+            m_lst = l2
+
+#        print(l2)
+#        print(zip(l2, l2[1:]))
+#        print(d)
+
+#    print(m_d, m_lst)
+
+    return math.sqrt(m_d), m_lst
+
+
+def organize_circles(circles, start_pt, end_pt):
+    try:
+        lst = [tuple(list(x[1][0]) + [i]) for i, x in enumerate(circles)]
+    except IndexError:
+        pass
+    else:
+        d, lst = min_path(lst, tuple(list(start_pt) + [-1]), tuple(list(end_pt) + [-1]))
+        circles = [circles[x[2]] for x in lst if x[2] >= 0]
+
+    return circles
 
 
 def line_length(pt1, pt2):
@@ -258,8 +302,8 @@ def draw_circles(img, circles):
 
         pt = (int(round(x)), int(round(y)))
         sz = int(round(diam / 2))
-        cv2.circle(img, pt, sz, (0, 255, 0), 2)
-        cv2.circle(img, pt, 2, (0, 0, 255), 3)
+        cv2.circle(img, pt, sz, (0, 255, 0), 2, lineType=cv2.LINE_AA)
+        cv2.circle(img, pt, 2, (0, 0, 255), 3, lineType=cv2.LINE_AA)
 
         label = chr(ord('A') + i)
         tx = int(round(x + diam / 2))
@@ -287,6 +331,41 @@ def draw_table(img, circles):
             # cv2.putText(img, '{} {:.1f} {:.1f}'.format(label, diam, a), h(i), c_label_font, c_label_s, c_label_color)
             cv2.putText(img, '{}'.format(label), h(i), c_label_font, c_label_s, c_label_color)
 
+
+def round_pt(pt):
+    return tuple([int(round(x)) for x in pt])
+
+
+def draw_path(img, circles, start_pt, end_pt):
+    global c_crop_rect, c_machine_rect
+    if not (circles and c_crop_rect and c_machine_rect):
+        return
+
+    pt0 = c_crop_rect[0]
+    mpt0 = c_machine_rect[0]
+
+    w = c_crop_rect[1][0] - c_crop_rect[0][0]
+    h = c_crop_rect[1][1] - c_crop_rect[0][1]
+    mw = c_machine_rect[1][0] - c_machine_rect[0][0]
+    mh = c_machine_rect[1][1] - c_machine_rect[0][1]
+
+    def mpt_to_pt(mpt):
+        x = (mpt[0] - mpt0[0]) / mw * w + pt0[0]
+        y = (mpt[1] - mpt0[1]) / mh * h + pt0[1]
+
+        return round_pt((x, y))
+
+    try:
+        lst = [round_pt(x[0][0]) for x in circles]
+        lst = [mpt_to_pt(start_pt)] + lst + [mpt_to_pt(end_pt)]
+    except IndexError:
+        pass
+    else:
+        for i in range(len(lst)-1):
+            pt1 = lst[i]
+            pt2 = lst[i+1]
+            cv2.line(img, pt1, pt2, c_path_color, thickness=c_line_s, lineType=cv2.LINE_AA)
+        
 
 @static_vars(fps_lst=[], fps_t1=None)
 def draw_fps(image):
@@ -376,16 +455,19 @@ def get_measurement(video_capture):
     else:
         image1 = image0.copy()
 
+    start_mpt = (6, 0)
+    end_mpt = (0, 0)
+
     circles = find_holes(image1)
+    circles = organize_circles(circles, start_mpt, end_mpt)
 
     image_b = image1.copy()
     draw_table(image_b, circles)
     draw_circles(image_b, circles)
+    draw_path(image_b, circles, start_mpt, end_mpt) 
 
     global c_crop_rect
     if c_crop_rect:
-        def round_pt(pt):
-            return tuple([int(round(x)) for x in pt])
         cv2.rectangle(image_b, round_pt(c_crop_rect[0]), round_pt(c_crop_rect[1]), c_line_color, c_line_s)
 
     global c_view
