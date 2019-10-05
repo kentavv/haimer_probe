@@ -53,6 +53,7 @@ import z_camera
 
 c_slow_dwell = 2.
 c_fast_dwell = .5
+c_feedrate = 5
 
 cnc_s = None
 cnc_c = None
@@ -69,7 +70,7 @@ class OvershootException(Exception):
 
 def move_to(x, y, z):
     # cmd = 'G1 G54 X{0:f} Y{1:f} Z{2:f} f5'.format(x, y, z)
-    cmd = 'G1 G53 X{0:f} Y{1:f} Z{2:f} f5'.format(x, y, z)
+    cmd = 'G1 G53 X{0:f} Y{1:f} Z{2:f} f{3:d}'.format(x, y, z, c_feedrate)
     print('Command,' + cmd)
 
     cnc_c.mdi(cmd)
@@ -160,7 +161,7 @@ def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z):
         y = s.axis[1]['input']
         z = s.axis[2]['input']
 
-        mm_final, _ = haimer_camera.get_measurement(video_capture)
+        mm_final = haimer_camera.get_measurement(video_capture)
         if mm_final is None:
             print('mm_final is None')
             continue
@@ -319,6 +320,8 @@ def touch_off(axis, v):
     elif axis == 'y':
         cmd = 'G10 L2 P1 Y{}'.format(v)
     elif axis == 'z':
+        # Offset the position v by the tool length along the z axis.
+        # http://linuxcnc.org/docs/2.7/html/gcode/overview.html#sub:numbered-parameters
         cmd = 'G10 L2 P1 Z[{} - #5403]'.format(v)
     else:
         cmd = None
@@ -332,31 +335,51 @@ def touch_off(axis, v):
 
 
 def find_left_edge(video_capture):
-    lst, dlst = find_edge(video_capture, [1, 0, 0])
-    touch_off('x', lst[0])
-    return lst, dlst
+    return find_edge(video_capture, [1, 0, 0])
 
 
 def find_right_edge(video_capture):
-    lst, dlst = find_edge(video_capture, [-1, 0, 0])
+    return find_edge(video_capture, [-1, 0, 0])
+
+
+def find_aft_edge(video_capture):
+    return find_edge(video_capture, [0, -1, 0])
+
+
+def find_forward_edge(video_capture):
+    return find_edge(video_capture, [0, 1, 0])
+
+
+def find_top_edge(video_capture):
+    return find_edge(video_capture, [0, 0, -1])
+
+
+def touch_off_left_edge(video_capture):
+    lst, dlst = find_left_edge(video_capture)
     touch_off('x', lst[0])
     return lst, dlst
 
 
-def find_aft_edge(video_capture):
-    lst, dlst = find_edge(video_capture, [0, -1, 0])
+def touch_off_right_edge(video_capture):
+    lst, dlst = find_right_edge(video_capture)
+    touch_off('x', lst[0])
+    return lst, dlst
+
+
+def touch_off_aft_edge(video_capture):
+    lst, dlst = find_aft_edge(video_capture)
     touch_off('y', lst[1])
     return lst, dlst
 
 
-def find_forward_edge(video_capture):
-    lst, dlst = find_edge(video_capture, [0, 1, 0])
+def touch_off_forward_edge(video_capture):
+    lst, dlst = find_forward_edge(video_capture)
     touch_off('y', lst[1])
     return lst, dlst
 
 
-def find_top_edge(video_capture):
-    lst, dlst = find_edge(video_capture, [0, 0, -1])
+def touch_off_top_edge(video_capture):
+    lst, dlst = find_top_edge(video_capture)
     touch_off('z', lst[2])
     return lst, dlst
 
@@ -407,28 +430,32 @@ def find_corner(video_capture, direction):
     y = edge_y[1]
     z = s.axis[2]['input']
 
-    print('Touch off at', x, y)
-
-    touch_off('x', x)
-    touch_off('y', y)
-
     return (x, y, z), (x - start_x, y - start_y, z - start_z)
 
 
-def find_ul_corner(video_capture):
-    return find_corner(video_capture, 'ul')
+def touch_off_corner(video_capture, direction):
+    lst, dlst = find_corner(video_capture, direction)
+    x, y = lst[:2]
+    print('Touch off at', x, y)
+    touch_off('x', x)
+    touch_off('y', y)
+    return lst, dlst
 
 
-def find_ur_corner(video_capture):
-    return find_corner(video_capture, 'ur')
+def touch_off_ul_corner(video_capture):
+    return touch_off_corner(video_capture, 'ul')
 
 
-def find_ll_corner(video_capture):
-    return find_corner(video_capture, 'll')
+def touch_off_ur_corner(video_capture):
+    return touch_off_corner(video_capture, 'ur')
 
 
-def find_lr_corner(video_capture):
-    return find_corner(video_capture, 'lr')
+def touch_off_ll_corner(video_capture):
+    return touch_off_corner(video_capture, 'll')
+
+
+def touch_off_lr_corner(video_capture):
+    return touch_off_corner(video_capture, 'lr')
 
 
 def find_center_of_hole(video_capture):
@@ -470,12 +497,16 @@ def find_center_of_hole(video_capture):
     y = s.axis[1]['input']
     z = s.axis[2]['input']
 
-    print('Centered in circle at', x, y)
+    return (x, y, z), (x - start_x, y - start_y, z - start_z)
 
+
+def touch_off_center_of_hole(video_capture):
+    lst, dlst = find_center_of_hole(video_capture)
+    x, y = lst[:2]
+    print('Centered in circle at', x, y)
     touch_off('x', x)
     touch_off('y', y)
-
-    return (x, y, z), (x - start_x, y - start_y, z - start_z)
+    return lst, dlst
 
 
 def probe3d(video_capture):
@@ -522,16 +553,16 @@ def main():
     video_capture = haimer_camera.gauge_vision_setup()
     video_capture2 = z_camera.gauge_vision_setup()
 
-    cmds = {ord('0'): find_center_of_hole,
-            ord('4'): find_right_edge,
-            ord('6'): find_left_edge,
-            ord('8'): find_forward_edge,
-            ord('2'): find_aft_edge,
-            ord('5'): find_top_edge,
-            ord('1'): find_ur_corner,
-            ord('3'): find_ul_corner,
-            ord('7'): find_lr_corner,
-            ord('9'): find_ll_corner
+    cmds = {ord('0'): touch_off_center_of_hole,
+            ord('4'): touch_off_right_edge,
+            ord('6'): touch_off_left_edge,
+            ord('8'): touch_off_forward_edge,
+            ord('2'): touch_off_aft_edge,
+            ord('5'): touch_off_top_edge,
+            ord('1'): touch_off_ur_corner,
+            ord('3'): touch_off_ul_corner,
+            ord('7'): touch_off_lr_corner,
+            ord('9'): touch_off_ll_corner
             }
 
     # Warm up
