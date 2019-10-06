@@ -69,6 +69,10 @@ c_label_s = .8
 
 video_capture2 = None
 
+class InvalidImage(Exception):
+    pass
+
+
 class QuitException(Exception):
     pass
 
@@ -792,6 +796,7 @@ def update_view(video_capture, video_capture2):
     if haimer_img.shape == (1008, 1344, 3):
         haimer_img = cv2.resize(haimer_img, (960, 720))
     final_img = np.hstack([z_img, haimer_img])
+    z_camera.draw_fps(final_img)
 
     if _error_str:
         s = 'WARNING: ' + _error_str
@@ -897,6 +902,16 @@ def main():
             display_error(str(e))
         except NotReady as e:
             display_error(str(e))
+        except (haimer_camera.InvalidImage, z_camera.InvalidImage, InvalidImage):
+            s = linuxcnc.stat()
+            s.poll()
+
+            moving = is_moving(s)
+
+            cnc_c.abort()
+            print('Invalid image', moving)
+
+            sys.exit(1)
         except (haimer_camera.QuitException, z_camera.QuitException, QuitException):
             s = linuxcnc.stat()
             s.poll()
