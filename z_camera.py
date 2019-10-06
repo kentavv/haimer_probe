@@ -38,6 +38,7 @@ import numpy as np
 import camera
 
 c_camera_name = 'Z-Camera'
+c_demo_mode = True
 
 c_final_image_scale_factor = 1
 
@@ -52,7 +53,9 @@ c_line_s = 2
 c_crop_rect = None
 c_machine_rect = [[0.0, 0.0], [4.266, 3.0]]
 
-c_demo_mode = False
+
+class InvalidImage(Exception):
+    pass
 
 
 class QuitException(Exception):
@@ -371,10 +374,10 @@ def next_frame(video_capture):
 
     if not retval:
         print('rv is false')
-        sys.exit(1)
+        raise InvalidImage()
     if image0.size == 0:
         print('image0 is empty')
-        sys.exit(1)
+        raise InvalidImage()
 
     return image0
 
@@ -409,7 +412,7 @@ def draw_selected_points(img, pts, c=(255, 64, 32), t=3):
         cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=t, lineType=cv2.LINE_AA)
 
 
-@static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(0, 0), end_mpt=(0, 0), cur_mpt=None, last_frame=None)
+@static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(0, 0), end_mpt=(0, 0), cur_mpt=None, last_frame=None, standalone=False)
 def get_measurement(video_capture):
     if not get_measurement.pause_updates:
         image0 = next_frame(video_capture)
@@ -536,7 +539,8 @@ def get_measurement(video_capture):
     else:
         cv2.putText(final_img, 'Size (WxH): {:.3f} x {:.3f}'.format(*c_machine_rect[1]), (20, 30), c_label_font, c_label_s, c_label_color)
 
-    draw_fps(final_img)
+    if get_measurement.standalone:
+        draw_fps(final_img)
 
     return circles, final_img
 
@@ -680,6 +684,8 @@ def main():
     video_capture = gauge_vision_setup()
     cv2.namedWindow(c_camera_name)
     cv2.setMouseCallback(c_camera_name, click_and_crop)
+
+    get_measurement.standalone = True
 
     while True:
         try:
