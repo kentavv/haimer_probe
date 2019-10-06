@@ -1,3 +1,4 @@
-1. change haimer_camera.py to use a different interface than the numeric keys to control the direction of movement. These in conflict with entering the plate size of z_camera.py. Maybe an on screen dialog?
-2. copy the new error string code into z_camera.py. Maybe have it in a module that's included. What other shared methods are there?
-3. sometimes, there is oscillation around the gauge reading 0 (solved now or just reduced?)
+* Change haimer_camera.py to use a different interface than the numeric keys to control the direction of movement. These in conflict with entering the plate size of z_camera.py. Maybe an on screen dialog? At the very least, have a keyboard command for "start seeking, press a numeric key"
+* What methods are shared between the two cameras? The error message drawing code is one.
+* Sometimes, there is oscillation around the gauge reading 0 (solved now or just reduced?)
+* Would be nice to have a moving point on the z_camera view showing the position of the probe tip.

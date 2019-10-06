@@ -385,12 +385,12 @@ def draw_fps(image):
     cv2.putText(image, '{:.2f} fps'.format(fps), (20, image.shape[0] - 30), c_label_font, c_label_s, c_label_color)
 
 
-error_str = None
+_error_str = None
 
 
 def display_error(s):
-    global error_str
-    error_str = s
+    global _error_str
+    _error_str = s
 
 
 @static_vars(ind=0)
@@ -489,12 +489,18 @@ def get_measurement(video_capture):
     if not mouse_sqr_pts_done and get_measurement.mouse_op == 'alignment':
         draw_selected_points(final_img, mouse_sqr_pts)
 
-    if error_str:
-        print(error_str)
+    if _error_str:
+        s = 'WARNING: ' + _error_str
+
         c_label_font_error = cv2.FONT_HERSHEY_SIMPLEX
         c_label_color_error = (0, 0, 255)
         c_label_s_error = 1.5
-        cv2.putText(final_img, 'WARNING: ' + error_str, (200, final_img.shape[0] // 2 - 20), c_label_font_error, c_label_s_error, c_label_color_error, 3)
+
+        thickness = 3
+        text_size, baseline = cv2.getTextSize(s, c_label_font_error, c_label_s_error, thickness)
+
+        text_pos = ((final_img.shape[1] - text_size[0]) // 2, (final_img.shape[0] + text_size[1]) // 2)
+        cv2.putText(final_img, s, text_pos, c_label_font_error, c_label_s_error, c_label_color_error, thickness)
 
     if get_measurement.record:
         fn1 = 'mov_raw_z_{:06}.ppm'.format(get_measurement.record_ind)
