@@ -33,6 +33,9 @@ INTERP_IDLE = 0
 
 
 class Stat:
+    def __init__(self):
+        return
+
     def poll(self):
         return
 
@@ -49,10 +52,14 @@ class Stat:
 
 
 class Command:
+    def __init__(self):
+        return
+
     def mode(self, _):
         return
 
-    def wait_complete(self):
+    @staticmethod
+    def wait_complete():
         return True
 
 
