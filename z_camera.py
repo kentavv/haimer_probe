@@ -50,6 +50,7 @@ c_label_s = .8
 
 c_line_color = (0, 200, 0)
 c_path_color = (200, 200, 64)
+c_incomplete_color = (0, 0, 200)
 c_line_s = 2
 
 c_crop_rect = None
@@ -256,7 +257,7 @@ def add_pts(pt1, pt2):
     return tuple([x + y for x, y in zip(pt1, pt2)])
 
 
-def draw_path(img, circles, start_pt, end_pt, cur_pt):
+def draw_path(img, circles, start_pt, end_pt, cur_pt, path_locked):
     global c_crop_rect, c_machine_rect
     if not (circles and c_crop_rect and c_machine_rect):
         return
@@ -277,7 +278,7 @@ def draw_path(img, circles, start_pt, end_pt, cur_pt):
 
     def mpt_to_pt_z(mpt):
         max_sz = 50.
-        z = (mpt[2] - 0.) / z_max_z_travel * max_sz
+        z = (mpt[2] - 0.) / c_max_z_travel * max_sz
         return z
 
     try:
@@ -289,7 +290,8 @@ def draw_path(img, circles, start_pt, end_pt, cur_pt):
         for i in range(len(lst) - 1):
             pt1 = lst[i]
             pt2 = lst[i + 1]
-            cv2.line(img, pt1, pt2, c_path_color, thickness=c_line_s, lineType=cv2.LINE_AA)
+            c = c_path_color if path_locked else c_incomplete_color
+            cv2.line(img, pt1, pt2, c, thickness=c_line_s, lineType=cv2.LINE_AA)
 
     if cur_pt is not None:
         sz = mpt_to_pt_z(cur_pt)
@@ -372,11 +374,14 @@ def get_measurement(video_capture):
     image_b = image1.copy()
     draw_table(image_b, circles)
     draw_circles(image_b, circles)
-    draw_path(image_b, circles, get_measurement.start_mpt, get_measurement.end_mpt, get_measurement.cur_mpt)
+    draw_path(image_b, circles, get_measurement.start_mpt, get_measurement.end_mpt, get_measurement.cur_mpt, get_measurement.pause_updates)
+
+    global in_alignment
 
     global c_crop_rect
     if c_crop_rect:
-        cv2.rectangle(image_b, round_pt(c_crop_rect[0]), round_pt(c_crop_rect[1]), c_line_color, c_line_s)
+        c = c_incomplete_color if in_alignment else c_line_color
+        cv2.rectangle(image_b, round_pt(c_crop_rect[0]), round_pt(c_crop_rect[1]), c, c_line_s)
 
     # Build and display composite image
     final_img = None
@@ -422,8 +427,6 @@ def get_measurement(video_capture):
                     # print(f'Wrote images {fn1} and {fn2}')
                     print('Wrote images {} and {}'.format(fn1, fn2))
                     break
-
-    global in_alignment
 
     if not get_measurement.pause_updates:
         if get_measurement.mouse_op == 'alignment' and get_measurement.c_view == 1:
