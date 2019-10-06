@@ -2,3 +2,4 @@
 * What methods are shared between the two cameras? The error message drawing code is one.
 * Sometimes, there is oscillation around the gauge reading 0 (solved now or just reduced?)
 * Would be nice to have a moving point on the z_camera view showing the position of the probe tip.
+* Merge camera views into one screen. This requires returning images from each module to linux_cnc.py, scaling, and placing them side by side. Then when a mouse event occurs, offset the position and send to the mouse callback operation in the appropiate module.
