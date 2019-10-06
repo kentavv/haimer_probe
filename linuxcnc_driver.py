@@ -57,7 +57,7 @@ import haimer_camera
 import z_camera
 
 c_camera_name = 'KvvCreates'
-c_demo_mode = True
+c_demo_mode = False
 
 if c_demo_mode:
     import linuxcnc_stub as linuxcnc
@@ -773,14 +773,16 @@ def update_view(video_capture, video_capture2):
             }
 
     lst = machine_to_part_cs()
-    z_camera.get_measurement.start_mpt = lst
+    if not z_camera.get_measurement.pause_updates:
+        z_camera.get_measurement.start_mpt = lst
     z_camera.get_measurement.cur_mpt = lst
 
     mm_final, haimer_img = haimer_camera.get_measurement(video_capture)
     circles, z_img = z_camera.get_measurement(video_capture2)
-    target_sz = (960, 720)
+    target_sz = (720, 640)
     if haimer_img.shape[:2] != target_sz:
-        haimer_img = cv2.resize(haimer_img, target_sz)
+        # The debug view is (1008, 1344), so the aspect of the resized image will be different than source image
+        haimer_img = cv2.resize(haimer_img, (target_sz[1], target_sz[0]))
     final_img = np.hstack([z_img, haimer_img])
     common.draw_fps(final_img)
 
