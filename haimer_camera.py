@@ -646,6 +646,9 @@ def process_key(key):
 
 
 def gauge_vision_setup():
+    if c_demo_mode:
+        return None
+
     video_capture = cv2.VideoCapture(1)
     if not video_capture.isOpened():
         print('camera is not open')
