@@ -39,8 +39,9 @@ import common
 from common import next_frame
 
 c_camera_name = 'Z-Camera'
-c_demo_mode = True
+c_demo_mode = False
 
+c_max_z_travel = 8.
 c_final_image_scale_factor = 1
 
 c_label_font = cv2.FONT_HERSHEY_SIMPLEX
@@ -275,10 +276,8 @@ def draw_path(img, circles, start_pt, end_pt, cur_pt):
         return round_pt((x, y))
 
     def mpt_to_pt_z(mpt):
-        max_z = 10.
         max_sz = 50.
-        z = (mpt[2] - 0) / max_z * max_sz
-        print(mpt[2], max_z, z)
+        z = (mpt[2] - 0.) / z_max_z_travel * max_sz
         return z
 
     try:
@@ -342,6 +341,10 @@ def draw_selected_points(img, pts, c=(0, 0, 255), t=1):
 @common.static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(0, 0), end_mpt=(0, 0), cur_mpt=None,
                     last_image0=None, last_image1=None, last_circles=[], standalone=False)
 def get_measurement(video_capture):
+    if not get_measurement.standalone:
+        get_measurement.record = False
+        get_measurement.save = False
+
     if not get_measurement.pause_updates:
         image0 = next_frame2(video_capture)
         get_measurement.last_image0 = image0
@@ -392,32 +395,33 @@ def get_measurement(video_capture):
     if not mouse_sqr_pts_done and get_measurement.mouse_op == 'alignment':
         draw_selected_points(final_img, mouse_sqr_pts)
 
-    common.draw_error(final_img)
+    if get_measurement.standalone:
+        common.draw_error(final_img)
 
-    if get_measurement.record:
-        fn1 = 'mov_raw_z_{:06}.ppm'.format(get_measurement.record_ind)
-        cv2.imwrite(fn1, image0)
-        # fn2 = 'mov_all_z_{:06}.ppm'.format(get_measurement.record_ind)
-        # cv2.imwrite(fn2, img_all)
-        fn3 = 'mov_fin_z_{:06}.ppm'.format(get_measurement.record_ind)
-        cv2.imwrite(fn3, final_img)
-        get_measurement.record_ind += 1
-        print('Recorded {} {}'.format(fn1, fn3))
+        if get_measurement.record:
+            fn1 = 'mov_raw_z_{:06}.ppm'.format(get_measurement.record_ind)
+            cv2.imwrite(fn1, image0)
+            # fn2 = 'mov_all_z_{:06}.ppm'.format(get_measurement.record_ind)
+            # cv2.imwrite(fn2, img_all)
+            fn3 = 'mov_fin_z_{:06}.ppm'.format(get_measurement.record_ind)
+            cv2.imwrite(fn3, final_img)
+            get_measurement.record_ind += 1
+            print('Recorded {} {}'.format(fn1, fn3))
 
-    if get_measurement.save:
-        get_measurement.save = False
+        if get_measurement.save:
+            get_measurement.save = False
 
-        for i in range(100):
-            # fn1 = f'raw_z_{i:03}.png'
-            fn1 = 'raw_z_{:03}.png'.format(i)
-            if not os.path.exists(fn1):
-                cv2.imwrite(fn1, image0)
-                # fn2 = f'all_z_{i:03}.png'
-                fn2 = 'all_z_{:03}.png'.format(i)
-                cv2.imwrite(fn2, final_img)
-                # print(f'Wrote images {fn1} and {fn2}')
-                print('Wrote images {} and {}'.format(fn1, fn2))
-                break
+            for i in range(100):
+                # fn1 = f'raw_z_{i:03}.png'
+                fn1 = 'raw_z_{:03}.png'.format(i)
+                if not os.path.exists(fn1):
+                    cv2.imwrite(fn1, image0)
+                    # fn2 = f'all_z_{i:03}.png'
+                    fn2 = 'all_z_{:03}.png'.format(i)
+                    cv2.imwrite(fn2, final_img)
+                    # print(f'Wrote images {fn1} and {fn2}')
+                    print('Wrote images {} and {}'.format(fn1, fn2))
+                    break
 
     global in_alignment
 
