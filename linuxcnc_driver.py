@@ -54,6 +54,7 @@ import z_camera
 c_slow_dwell = 2.
 c_fast_dwell = .5
 c_feedrate = 5
+c_feedrate_fast = 20
 
 cnc_s = None
 cnc_c = None
@@ -68,9 +69,12 @@ class OvershootException(Exception):
         return s
 
 
-def move_to(x, y, z):
+def move_to(x, y, z, feedrate=None):
+    if feedrate is None:
+        feedrate = c_feedrate
+
     # cmd = 'G1 G54 X{0:f} Y{1:f} Z{2:f} f5'.format(x, y, z)
-    cmd = 'G1 G53 X{0:f} Y{1:f} Z{2:f} f{3:d}'.format(x, y, z, c_feedrate)
+    cmd = 'G1 G53 X{0:f} Y{1:f} Z{2:f} f{3:d}'.format(x, y, z, feedrate)
     print('Command,' + cmd)
 
     cnc_c.mdi(cmd)
@@ -136,9 +140,17 @@ def is_moving(s):
     return any([abs(s.axis[x]['velocity']) > 0. for x in range(3)])
 
 
-def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z):
+def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z, max_mm=1.0, local=False, feedrate=None):
+    if feedrate is None:
+        feedrate = c_feedrate
+
     cnc_c.mode(linuxcnc.MODE_MDI)
     cnc_c.wait_complete()
+
+    if local:
+        print('Converting:', [cmd_x, cmd_y, cmd_z])
+        cmd_x, cmd_y, cmd_z = part_to_machine_cs([cmd_x, cmd_y, cmd_z])
+        print('Converted:', [cmd_x, cmd_y, cmd_z])
 
     state = 0
     d1 = None
@@ -166,7 +178,7 @@ def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z):
             print('mm_final is None')
             continue
 
-        if mm_final > 1.0:
+        if mm_final > max_mm:
             cnc_c.abort()
             raise OvershootException(mm_final)
 
@@ -180,7 +192,7 @@ def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z):
                 state = 1
                 continue
             elif state == 1:
-                move_to(cmd_x, cmd_y, cmd_z)
+                move_to(cmd_x, cmd_y, cmd_z, feedrate=feedrate)
             elif state == 2:
                 dx = x - cmd_x
                 dy = y - cmd_y
@@ -244,6 +256,9 @@ def find_edge(video_capture, direction):
 
         #    print('mm_final:', mm_final, 'in_final:', in_final, 'cur_x:', x, 'tar_x:', tar_x, 'xe:', xe, 'cmd_x:', cmd_x, ok_for_mdi(s))
 
+        div_f = 2
+        in_state_3 = 0
+
         if ok_for_mdi(s) and not moving:
             # print('state', state, 'total_e:', total_e, 'in_final:', in_final, 'mm_final:', mm_final)
             print('state', state, 'in_final:', in_final, 'mm_final:', mm_final)
@@ -284,15 +299,20 @@ def find_edge(video_capture, direction):
                             state = 4
                 continue
             elif state == 3:
+                in_state_3 += 1
+                if in_state_3 > 5:
+                    print('Oscillation may be occuring. Reducing div_f')
+                    # Could alternatively increase the finishing error tolerance
+                    div_f = 4
                 if abs(mm_final) > .05:
                     cmd_x = x - xe * .95
                     cmd_y = y - ye * .95
                     cmd_z = z - ze * .95
                 else:
                     print('part2')
-                    cmd_x = x - xe / 2
-                    cmd_y = y - ye / 2
-                    cmd_z = z - ze / 2
+                    cmd_x = x - xe / div_f
+                    cmd_y = y - ye / div_f
+                    cmd_z = z - ze / div_f
                 move_to(cmd_x, cmd_y, cmd_z)
                 state = 2
             elif state == 4:
@@ -469,22 +489,22 @@ def find_center_of_hole(video_capture):
     start_z = s.axis[2]['input']
 
     left, _ = find_left_edge(video_capture)
-    _, _ = monitored_move_to(video_capture, start_x, start_y, start_z)
+    _, _ = monitored_move_to(video_capture, start_x, start_y, start_z, feedrate=c_feedrate_fast)
 
     right, _ = find_right_edge(video_capture)
 
     dx = right[0] - left[0]
     cmd_x = left[0] + dx / 2.
-    _, _ = monitored_move_to(video_capture, cmd_x, start_y, start_z)
+    _, _ = monitored_move_to(video_capture, cmd_x, start_y, start_z, feedrate=c_feedrate_fast)
 
     aft, _ = find_aft_edge(video_capture)
-    _, _ = monitored_move_to(video_capture, cmd_x, start_y, start_z)
+    _, _ = monitored_move_to(video_capture, cmd_x, start_y, start_z, feedrate=c_feedrate_fast)
 
     forward, _ = find_forward_edge(video_capture)
 
     dy = forward[1] - aft[1]
     cmd_y = aft[1] + dy / 2.
-    _, _ = monitored_move_to(video_capture, cmd_x, cmd_y, start_z)
+    _, _ = monitored_move_to(video_capture, cmd_x, cmd_y, start_z, feedrate=c_feedrate_fast)
 
     dz = 0
 
@@ -497,13 +517,15 @@ def find_center_of_hole(video_capture):
     y = s.axis[1]['input']
     z = s.axis[2]['input']
 
-    return (x, y, z), (x - start_x, y - start_y, z - start_z)
+    diam = dy
+
+    return (x, y, z), (x - start_x, y - start_y, z - start_z), (dx, dy, dz), diam
 
 
 def touch_off_center_of_hole(video_capture):
-    lst, dlst = find_center_of_hole(video_capture)
+    lst, dlst, _, diam = find_center_of_hole(video_capture)
     x, y = lst[:2]
-    print('Centered in circle at', x, y)
+    print('Centered in circle at', x, y, 'with diameter', diam)
     touch_off('x', x)
     touch_off('y', y)
     return lst, dlst
@@ -535,6 +557,157 @@ def probe3d(video_capture):
         sys.stdout.flush()
 
     return final_pts
+
+
+def part_to_machine_cs(pt):
+    global cnc_s
+    cnc_s.poll()
+
+    tool_off = cnc_s.tool_offset[:3]
+    g92_off = cnc_s.g92_offset[:3]
+    g5x_off = cnc_s.g5x_offset[:3]
+    machine_pos = cnc_s.position[:3]
+
+# position + tool_off + g5x_off + g92_off = machine_pos
+# position = machine_pos - g92_off - g5x_off - tool_off
+    nm = [pt[i] + tool_off[i] + g5x_off[i] + g92_off[i] for i in range(3)]
+    return nm
+
+
+def machine_to_part_cs(machine_pos=None):
+    global cnc_s
+    cnc_s.poll()
+
+    tool_off = cnc_s.tool_offset[:3]
+    g92_off = cnc_s.g92_offset[:3]
+    g5x_off = cnc_s.g5x_offset[:3]
+    if machine_pos is None:
+        machine_pos = cnc_s.position[:3]
+
+# position + tool_off + g5x_off + g92_off = machine_pos
+# position = machine_pos - g92_off - g5x_off - tool_off
+    nm = [machine_pos[i] - g92_off[i] - g5x_off[i] - tool_off[i] for i in range(3)]
+    return nm
+
+
+def go():
+    global cnc_s
+    global cnc_c
+
+    cnc_s.poll()
+    print(dir(cnc_s))
+    print(dir(cnc_c))
+    print(cnc_s.g5x_index)
+    print(cnc_s.tool_in_spindle)
+    print(cnc_s.linear_units)
+
+    tool_off = cnc_s.tool_offset[:3]
+    g92_off = cnc_s.g92_offset[:3]
+    g5x_off = cnc_s.g5x_offset[:3]
+    machine_pos = cnc_s.position[:3]
+
+    print('tool_off', tool_off)
+    print('g92_off', g92_off)
+    print('g5x_off', g5x_off)
+    print('machine_pos (relative to home position)', machine_pos)
+    print('axis_input', [cnc_s.axis[i]['input'] for i in range(3)])
+    print('axis_output', [cnc_s.axis[i]['output'] for i in range(3)])
+
+    print('part_to_machine_cs([0,0,0])', part_to_machine_cs([0, 0, 0]))
+    print('machine_to_part_cs()', machine_to_part_cs())
+
+    return machine_to_part_cs()
+
+
+# Machine Coordinates (G53)
+# Nine Coordinate System Offsets (G54-G59.3)
+# Global Offsets (G92)
+# Is a good use case would be G92 to the corner of a fixture plate and G54-59.3 to each part location relative to the fixture plate location?
+# The G54-G59.3 values could then be saved and only G92 would need to be set when the fixture plate is located.
+# machine_origin is the home position of the machine, it is set by homing the machine
+# machine_pos is the offset from the machine origin (machine coordinate system)
+# g92_off contains offsets of the origin, they are added to commanded position to produce a machine position (global coordinate system) (persistent)
+# g5x_off contains offsets of the origin, they are added to commanded position to produce a machine position (local or part coordinate system) (persistent)
+
+#1
+#53
+#0.0393700787402
+#('tool_off', (0.0, 0.0, 3.652))
+#('g92_off', (0.0, 0.0, 0.0))
+#('g5x_off', (1.3769656307399998, -2.31421642429, -8.739318121759998))
+#('machine_pos', (2.951150911092579, -0.3856613977556656, 0.017924044147022797))
+# 1.5742 1.9285 5.1051
+
+#1
+#100
+#0.0393700787402
+#('tool_off', (0.0, 0.0, 4.776))
+#('g92_off', (0.0, 0.0, 0.0))
+#('g5x_off', (1.3769656307399998, -2.31421642429, -8.739318121759998))
+#('machine_pos (relative to home position)', (2.951150911092579, -0.3856613977556656, 0.017924044147022797))
+# 1.5742 1.9285 3.9811
+
+#1
+#100
+#0.0393700787402
+#('tool_off', (0.0, 0.0, 4.776))
+#('g92_off', (0.0, 0.0, 0.0))
+#('g5x_off', (1.3769656307399998, -2.31421642429, -8.739318121759998))
+#('machine_pos (relative to home position)', (2.951150911092579, -0.3856613977556656, -0.8220035369112901))
+# 1.5742 1.9285 3.1413
+
+
+def re_holes(video_capture, circles):
+    part_z = 5.4 / 25.4
+    # With a tight max_mm, it's likely to see false errors after the find_center_of_hole
+    # Having a dwell after find_center_of_hole so the needles can settle after the fast move to center might be enough.
+    # The best solution may be to read a few frames from the camera, clear out any old frames and get a dwell time
+    max_mm = -1.95
+
+    # The probe tip should travel half the tip diameter above the part surface
+    # The probe tip should drop into a hole, half the tip diameter plus 1mm
+    # The offsets may be a little different than expected because the probe compresses
+    # before reading 0. 
+    zh = part_z + haimer_camera.c_haimer_ball_diam / 25.4
+    zl = part_z - 1 / 25.4
+
+    lst = go()
+    sx, sy, sz = lst
+    start_pt = (sx, sy)
+    end_pt = (0, 0)
+    lst = []
+    for c in circles:
+        print(c)
+        if c[1]:
+            m_pt, diam = c[1]
+            lst += [c[1]]
+
+    results = []
+    if lst:
+        t0 = time.time()
+        (x, y), z = start_pt, zh
+        monitored_move_to(video_capture, x, y, z, max_mm=max_mm, local=True, feedrate=c_feedrate_fast)
+        for i, c in enumerate(lst):
+            lbl = chr(ord('A') + i)
+            (x, y), diam = c
+
+            monitored_move_to(video_capture, x, y, zh, max_mm=max_mm, local=True, feedrate=c_feedrate_fast)
+            monitored_move_to(video_capture, x, y, zl, max_mm=max_mm, local=True, feedrate=c_feedrate)
+            cpt, _, delta, diam2 = find_center_of_hole(video_capture)
+            ll = machine_to_part_cs(cpt)
+            ll2 = machine_to_part_cs()
+            results += [(lbl, time.time()-t0, x, y, ll[0], ll[1], ll2[0], ll2[1], diam, diam2, abs(delta[0]), abs(delta[1]))]
+            x, y = ll[:2]
+            # time.sleep(.25)
+            for i in range(10):
+                mm_final = haimer_camera.get_measurement(video_capture)
+                print(mm_final)
+            monitored_move_to(video_capture, x, y, zh, max_mm=max_mm, local=True, feedrate=c_feedrate_fast)
+
+        (x, y), z = end_pt, zh
+        monitored_move_to(video_capture, x, y, z, max_mm=max_mm, local=True, feedrate=c_feedrate_fast)
+
+    return results
 
 
 def main():
@@ -586,9 +759,20 @@ def main():
                 pass
 
             if key == ord('l'):
-                for c in circles:
-                    print(c)
+                results = re_holes(video_capture, circles)
+
                 print
+
+                print('results += [(lbl, time.time()-t0, x, y, ll[0], ll[1], ll2[0], ll2[1], diam, diam2, abs(delta[0]), abs(delta[1]))]')
+                for res in results:
+                    print(res)
+               
+                print
+            elif key == ord('g'):
+                lst = go()
+                print(lst)
+                z_camera.get_measurement.start_mpt = lst[:2]
+
         except OvershootException as e:
             cnc_c.abort()
             haimer_camera.display_error(str(e))
