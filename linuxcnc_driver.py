@@ -49,12 +49,18 @@ import sys
 import time
 
 import cv2
-import linuxcnc
 import numpy as np
 
+import common
 import haimer_camera
 import z_camera
-import common
+
+c_demo_mode = True
+
+if c_demo_mode:
+    import linuxcnc_stub as linuxcnc
+else:
+    import linuxcnc
 
 c_slow_dwell = 2.
 c_fast_dwell = .5
