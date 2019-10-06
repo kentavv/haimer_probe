@@ -340,7 +340,7 @@ def draw_selected_points(img, pts, c=(0, 0, 255), t=1):
 
 
 @common.static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(0, 0), end_mpt=(0, 0), cur_mpt=None,
-                    last_image0=None, last_image1=None, last_circles=[],  standalone=False)
+                    last_image0=None, last_image1=None, last_circles=[], standalone=False)
 def get_measurement(video_capture):
     if not get_measurement.pause_updates:
         image0 = next_frame2(video_capture)
