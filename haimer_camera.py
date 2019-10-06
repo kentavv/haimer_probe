@@ -52,7 +52,7 @@ import common
 from common import next_frame
 
 c_camera_name = 'HaimerCamera'
-c_demo_mode = True
+c_demo_mode = False
 
 c_haimer_ball_diam = 4.  # millimeters
 
@@ -421,6 +421,10 @@ def next_frame2(video_capture):
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
 
+    if not get_measurement.standalone:
+        get_measurement.record = False
+        get_measurement.save = False
+
     build_all = get_measurement.record or get_measurement.save or get_measurement.debug_view
 
     image0 = next_frame2(video_capture)
@@ -510,36 +514,37 @@ def get_measurement(video_capture):
     else:
         final_img = img_simple
 
-    common.draw_error(final_img)
+    if not get_measurement.standalone:
+        common.draw_error(final_img)
 
-    if get_measurement.record:
-        fn1 = 'mov_raw_h_{:06}.ppm'.format(get_measurement.record_ind)
-        cv2.imwrite(fn1, image0)
-        fn2 = 'mov_all_h_{:06}.ppm'.format(get_measurement.record_ind)
-        cv2.imwrite(fn2, img_all)
-        fn3 = 'mov_fin_h_{:06}.ppm'.format(get_measurement.record_ind)
-        cv2.imwrite(fn3, image2)
-        fn4 = 'mov_sim_h_{:06}.ppm'.format(get_measurement.record_ind)
-        cv2.imwrite(fn4, img_simple)
-        get_measurement.record_ind += 1
-        print('Recorded {} {} {} {}'.format(fn1, fn2, fn3, fn4))
+        if get_measurement.record:
+            fn1 = 'mov_raw_h_{:06}.ppm'.format(get_measurement.record_ind)
+            cv2.imwrite(fn1, image0)
+            fn2 = 'mov_all_h_{:06}.ppm'.format(get_measurement.record_ind)
+            cv2.imwrite(fn2, img_all)
+            fn3 = 'mov_fin_h_{:06}.ppm'.format(get_measurement.record_ind)
+            cv2.imwrite(fn3, image2)
+            fn4 = 'mov_sim_h_{:06}.ppm'.format(get_measurement.record_ind)
+            cv2.imwrite(fn4, img_simple)
+            get_measurement.record_ind += 1
+            print('Recorded {} {} {} {}'.format(fn1, fn2, fn3, fn4))
 
-    if get_measurement.save:
-        get_measurement.save = False
+        if get_measurement.save:
+            get_measurement.save = False
 
-        for i in range(100):
-            # fn1 = f'raw_h_{i:03}.png'
-            fn1 = 'raw_h_{:03}.png'.format(i)
-            if not os.path.exists(fn1):
-                cv2.imwrite(fn1, image0)
-                # fn2 = f'all_h_{i:03}.png'
-                fn2 = 'all_h_{:03}.png'.format(i)
-                cv2.imwrite(fn2, img_all)
-                fn3 = 'sim_h_{:03}.png'.format(i)
-                cv2.imwrite(fn3, img_simple)
-                # print(f'Wrote images {fn1} and {fn2}')
-                print('Wrote images {} {} {}'.format(fn1, fn2, fn3))
-                break
+            for i in range(100):
+                # fn1 = f'raw_h_{i:03}.png'
+                fn1 = 'raw_h_{:03}.png'.format(i)
+                if not os.path.exists(fn1):
+                    cv2.imwrite(fn1, image0)
+                    # fn2 = f'all_h_{i:03}.png'
+                    fn2 = 'all_h_{:03}.png'.format(i)
+                    cv2.imwrite(fn2, img_all)
+                    fn3 = 'sim_h_{:03}.png'.format(i)
+                    cv2.imwrite(fn3, img_simple)
+                    # print(f'Wrote images {fn1} and {fn2}')
+                    print('Wrote images {} {} {}'.format(fn1, fn2, fn3))
+                    break
 
     return mm_final, final_img
 
