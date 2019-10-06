@@ -1,3 +1,2 @@
 * An on-screen for selecting edge-finding direction.
 * Sometimes, there is oscillation around the gauge reading 0 (solved now or just less frequent?)
-* Z_camera.py could be optimized to reduce calculations after a set of circles is locked
