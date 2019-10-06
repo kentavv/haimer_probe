@@ -898,9 +898,9 @@ def main():
             moving = is_moving(s)
 
             cnc_c.abort()
-            print('Quit requested', moving)
 
             if moving:
+                print('Quit requested while still moving')
                 sys.exit(1)
             else:
                 break
