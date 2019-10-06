@@ -25,6 +25,8 @@
 # 1) How should non-circular holes be supported? Including rectangular,
 #    ellipse, and slots.
 
+from __future__ import print_function
+
 import math
 import os
 import sys
@@ -113,7 +115,7 @@ def organize_circles(circles, start_pt, end_pt):
     except IndexError:
         pass
     else:
-        d, lst = min_path(lst, tuple(list(start_pt) + [-1]), tuple(list(end_pt) + [-1]))
+        d, lst = min_path(lst, tuple(list(start_pt[:2]) + [-1]), tuple(list(end_pt[:2]) + [-1]))
         circles = [circles[x[2]] for x in lst if x[2] >= 0]
 
     return circles
@@ -238,7 +240,8 @@ def draw_circles(img, circles):
         pt = round_pt((x, y))
         sz = int(round(diam / 2))
         cv2.circle(img, pt, sz, (0, 255, 0), 2, lineType=cv2.LINE_AA)
-        cv2.circle(img, pt, 2, (0, 0, 255), 3, lineType=cv2.LINE_AA)
+        draw_crosshairs(img, pt, 6, (0, 0, 255), 1)
+        # cv2.circle(img, pt, 2, (0, 255, 0), 3, lineType=cv2.LINE_AA)
 
         label = chr(ord('A') + i)
         tpt = add_pts(pt, (sz + 1, sz + 1))
@@ -274,7 +277,7 @@ def add_pts(pt1, pt2):
     return tuple([x + y for x,y in zip(pt1, pt2)])
  
 
-def draw_path(img, circles, start_pt, end_pt):
+def draw_path(img, circles, start_pt, end_pt, cur_pt):
     global c_crop_rect, c_machine_rect
     if not (circles and c_crop_rect and c_machine_rect):
         return
@@ -289,9 +292,16 @@ def draw_path(img, circles, start_pt, end_pt):
 
     def mpt_to_pt(mpt):
         x = (mpt[0] - mpt0[0]) / mw * w + pt0[0]
-        y = (mpt[1] - mpt0[1]) / mh * h + pt0[1]
+        y = (-mpt[1] - mpt0[1]) / mh * h + pt0[1]
 
         return round_pt((x, y))
+
+    def mpt_to_pt_z(mpt):
+        max_z = 10.
+        max_sz = 50.
+        z = (mpt[2] - 0) / max_z * 50
+        print(mpt[2], max_z, z)
+        return z
 
     try:
         lst = [round_pt(x[0][0]) for x in circles]
@@ -303,6 +313,19 @@ def draw_path(img, circles, start_pt, end_pt):
             pt1 = lst[i]
             pt2 = lst[i+1]
             cv2.line(img, pt1, pt2, c_path_color, thickness=c_line_s, lineType=cv2.LINE_AA)
+   
+    if cur_pt is not None: 
+        sz = mpt_to_pt_z(cur_pt)
+        if sz >= 0:
+            c = (0, 255, 255) 
+            sz = abs(sz + 2)
+        else:
+            c = (0, 0, 255) 
+            sz = abs(sz - 2)
+        sz = int(round(sz))
+        pt = mpt_to_pt(cur_pt)
+        cv2.circle(img, pt, sz, c, 3, lineType=cv2.LINE_AA)
+
         
 
 @static_vars(fps_lst=[], fps_t1=None)
@@ -356,6 +379,11 @@ def next_frame(video_capture):
     return image0
 
 
+def draw_crosshairs(img, pt, off, c, thickness):
+    cv2.line(img, (pt[0] - off, pt[1]), (pt[0] + off, pt[1]), c, thickness=thickness, lineType=cv2.LINE_AA)
+    cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=thickness, lineType=cv2.LINE_AA)
+
+
 def draw_selected_points(img, pts, c=(255, 64, 32), t=3):
     # for i in range(len(pts)):
     #     pt1, pt2 = pts[i], pts[(i + 1) % len(pts)]
@@ -366,8 +394,7 @@ def draw_selected_points(img, pts, c=(255, 64, 32), t=3):
     off = 10
 
     for pt in pts[:-1]:
-        cv2.line(img, (pt[0] - off, pt[1]), (pt[0] + off, pt[1]), c, thickness=t, lineType=cv2.LINE_AA)
-        cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=t, lineType=cv2.LINE_AA)
+        draw_crosshairs(img, pt, off, c, t)
 
     if pts:
         pt = pts[-1]
@@ -382,9 +409,13 @@ def draw_selected_points(img, pts, c=(255, 64, 32), t=3):
         cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=t, lineType=cv2.LINE_AA)
 
 
-@static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(0, 0), end_mpt=(0, 0))
+@static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(0, 0), end_mpt=(0, 0), cur_mpt=None, last_frame=None)
 def get_measurement(video_capture):
-    image0 = next_frame(video_capture)
+    if not get_measurement.pause_updates:
+        image0 = next_frame(video_capture)
+        get_measurement.last_frame = image0
+    else:
+        image0 = get_measurement.last_frame
 
     if get_measurement.warp_m is not None:
         h, w = image0.shape[:2]
@@ -399,7 +430,7 @@ def get_measurement(video_capture):
     image_b = image1.copy()
     draw_table(image_b, circles)
     draw_circles(image_b, circles)
-    draw_path(image_b, circles, get_measurement.start_mpt, get_measurement.end_mpt) 
+    draw_path(image_b, circles, get_measurement.start_mpt, get_measurement.end_mpt, get_measurement.cur_mpt) 
 
     global c_crop_rect
     if c_crop_rect:
@@ -507,10 +538,7 @@ def get_measurement(video_capture):
 
     draw_fps(final_img)
 
-    if not get_measurement.pause_updates:
-        cv2.imshow(c_camera_name, final_img)
-
-    return circles
+    return circles, final_img
 
 
 in_alignment = False
@@ -546,7 +574,7 @@ def process_key(key):
             process_key.plate_size_str = ''
         elif key == 8:  # backspace
             process_key.plate_size_str = process_key.plate_size_str[:-1]
-        elif key == ord('q'):
+        elif key in [27, ord('q')]: # Escape or q
             raise QuitException
         elif key == 255:
             pass
@@ -563,7 +591,7 @@ def process_key(key):
         get_measurement.record = not get_measurement.record
     elif key == ord('s'):
         get_measurement.save = True
-    elif key == ord('a'):
+    elif key == ord('a'): # and not get_measurement.pause_updates:
         get_measurement.mouse_op = 'alignment'
         get_measurement.c_view = 1
         mouse_sqr_pts = []
@@ -578,7 +606,7 @@ def process_key(key):
         get_measurement.c_view = 2
     elif key == ord('3'):
         get_measurement.c_view = 3
-    elif key == ord('q'):
+    elif key in [27, ord('q')]: # Escape or q
         raise QuitException
     elif key != 255:
         print(key)
@@ -632,13 +660,10 @@ def click_and_crop(event, x, y, flags, param):
 
 
 def gauge_vision_setup():
-    cv2.namedWindow(c_camera_name)
-    cv2.setMouseCallback(c_camera_name, click_and_crop)
-
     if c_demo_mode:
         return None
 
-    video_capture = cv2.VideoCapture(1)
+    video_capture = cv2.VideoCapture(0)
     if not video_capture.isOpened():
         print('camera is not open')
         sys.exit(1)
@@ -653,10 +678,14 @@ def main():
     np.set_printoptions(precision=2)
 
     video_capture = gauge_vision_setup()
+    cv2.namedWindow(c_camera_name)
+    cv2.setMouseCallback(c_camera_name, click_and_crop)
 
     while True:
         try:
-            circles = get_measurement(video_capture)
+            circles, final_img = get_measurement(video_capture)
+            if not get_measurement.pause_updates:
+                cv2.imshow(c_camera_name, final_img)
             key = cv2.waitKey(5) & 0xff
             process_key(key)
             if key == ord('l'):
