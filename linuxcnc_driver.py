@@ -44,6 +44,7 @@
 
 from __future__ import print_function
 
+import csv
 import os
 import sys
 import time
@@ -714,6 +715,7 @@ def re_holes(video_capture, circles):
             # m_pt, diam = c[1]
             lst += [c[1]]
 
+    header = 'Circle,t (s),x (video),y (video),x (measured),y (measured),diam (video),diam (measured),diam (dx)'.split(',')
     results = []
     if lst:
         t0 = time.time()
@@ -726,17 +728,26 @@ def re_holes(video_capture, circles):
             monitored_move_to(video_capture, x, y, zh, max_mm=max_mm, local=True, feedrate=c_feedrate_fast)
             monitored_move_to(video_capture, x, y, zl, max_mm=max_mm, local=True, feedrate=c_feedrate)
             cpt, _, delta, diam2 = find_center_of_hole(video_capture)
+
+            # axis['input'] is used, but will be different from ['output'], not sure which is best to use
+            # 'input' seemed better because it's the position that was commanded and expected. Regardless,
+            # the difference seems to only be around 0.0001
             ll = machine_to_part_cs(cpt)
             ll2 = machine_to_part_cs()
-            results += [(lbl, time.time() - t0, x, y, ll[0], ll[1], ll2[0], ll2[1], diam, diam2, abs(delta[0]), abs(delta[1]))]
-            x, y = ll[:2]
+
+            results += [(lbl, time.time() - t0, x, y, ll[0], ll[1], diam, diam2, abs(delta[0]))]
+
+            # Move directly up, using current machine coordinates (which are slightly different than commanded coordinates)
+            x, y = ll2[:2]
+            # Following fast move to hole center, dwell a short period so probe and camera settle. There's
+            # no need for dwells between moves if the probe was not touching.
             camera_dwell(video_capture)
             monitored_move_to(video_capture, x, y, zh, max_mm=max_mm, local=True, feedrate=c_feedrate_fast)
 
         (x, y), z = end_pt, zh
         monitored_move_to(video_capture, x, y, z, max_mm=max_mm, local=True, feedrate=c_feedrate_fast)
 
-    return results
+    return header, results
 
 
 def click_and_crop(event, x0, y0, flags, param):
@@ -767,8 +778,9 @@ def update_view(video_capture, video_capture2):
 
     mm_final, haimer_img = haimer_camera.get_measurement(video_capture)
     circles, z_img = z_camera.get_measurement(video_capture2)
-    if haimer_img.shape == (1008, 1344, 3):
-        haimer_img = cv2.resize(haimer_img, (960, 720))
+    target_sz = (960, 720)
+    if haimer_img.shape[:2] != target_sz:
+        haimer_img = cv2.resize(haimer_img, target_sz)
     final_img = np.hstack([z_img, haimer_img])
     common.draw_fps(final_img)
 
@@ -821,15 +833,17 @@ def update_view(video_capture, video_capture2):
     elif key == ord('t'):
         update_view.do_touchoff = not update_view.do_touchoff
     elif key == ord('g'):
-        results = re_holes(video_capture, circles)
+        header, results = re_holes(video_capture, circles)
 
-        print()
-
-        print('results += [(lbl, time.time()-t0, x, y, ll[0], ll[1], ll2[0], ll2[1], diam, diam2, abs(delta[0]), abs(delta[1]))]')
+        rows = [header]
         for res in results:
-            print(res)
+            rows += [[rows[0]] + ['{:.4f}'.format(x) for x in res[1:]]]
 
-        print()
+        fn = 'circles.csv'
+        with open(fn, 'wb') as f:
+            c = csv.writer(f, rows)
+            c.writerows(rows)
+        print('\nProbing results saved to {}\n'.format(fn))
     elif key in [27, ord('q')]:  # Escape or q
         raise common.QuitException
     else:
