@@ -46,6 +46,8 @@ import time
 import cv2
 import numpy as np
 
+import camera
+
 c_camera_name = 'HaimerCamera'
 
 c_haimer_ball_diam = 4.  # millimeters
@@ -126,73 +128,6 @@ def line_angle(pt1, pt2):
     delta_x = pt2[0] - pt1[0]
     delta_y = pt2[1] - pt1[1]
     return math.atan2(delta_y, delta_x) + math.pi / 2.
-
-
-def list_camera_properties(video_cap):
-    capture_properties = [('cv2.CAP_PROP_POS_MSEC', True),
-                          ('cv2.CAP_PROP_POS_FRAMES', False),
-                          ('cv2.CAP_PROP_POS_AVI_RATIO', False),
-                          ('cv2.CAP_PROP_FRAME_WIDTH', True),
-                          ('cv2.CAP_PROP_FRAME_HEIGHT', True),
-                          ('cv2.CAP_PROP_FPS', True),
-                          ('cv2.CAP_PROP_FOURCC', True),
-                          ('cv2.CAP_PROP_FRAME_COUNT', False),
-                          ('cv2.CAP_PROP_FORMAT', True),
-                          ('cv2.CAP_PROP_MODE', True),
-                          ('cv2.CAP_PROP_BRIGHTNESS', True),
-                          ('cv2.CAP_PROP_CONTRAST', True),
-                          ('cv2.CAP_PROP_SATURATION', True),
-                          ('cv2.CAP_PROP_HUE', False),
-                          ('cv2.CAP_PROP_GAIN', False),
-                          ('cv2.CAP_PROP_EXPOSURE', True),
-                          ('cv2.CAP_PROP_CONVERT_RGB', True),
-                          ('cv2.CAP_PROP_WHITE_BALANCE_BLUE_U', False),
-                          ('cv2.CAP_PROP_RECTIFICATION', False),
-                          ('cv2.CAP_PROP_MONOCHROME', False),
-                          ('cv2.CAP_PROP_SHARPNESS', True),
-                          ('cv2.CAP_PROP_AUTO_EXPOSURE', True),
-                          ('cv2.CAP_PROP_GAMMA', False),
-                          ('cv2.CAP_PROP_TEMPERATURE', True),
-                          ('cv2.CAP_PROP_TRIGGER', False),
-                          ('cv2.CAP_PROP_TRIGGER_DELAY', False),
-                          ('cv2.CAP_PROP_WHITE_BALANCE_RED_V', False),
-                          ('cv2.CAP_PROP_ZOOM', True),
-                          ('cv2.CAP_PROP_FOCUS', True),
-                          ('cv2.CAP_PROP_GUID', False),
-                          ('cv2.CAP_PROP_ISO_SPEED', False),
-                          ('cv2.CAP_PROP_BACKLIGHT', True),
-                          ('cv2.CAP_PROP_PAN', True),
-                          ('cv2.CAP_PROP_TILT', True),
-                          ('cv2.CAP_PROP_ROLL', False),
-                          ('cv2.CAP_PROP_IRIS', False),
-                          ('cv2.CAP_PROP_SETTINGS', False),
-                          ('cv2.CAP_PROP_BUFFERSIZE', True),
-                          ('cv2.CAP_PROP_AUTOFOCUS', True),
-                          ('cv2.CAP_PROP_SAR_NUM', False),
-                          ('cv2.CAP_PROP_SAR_DEN', False),
-                          ('cv2.CAP_PROP_BACKEND', True),
-                          ('cv2.CAP_PROP_CHANNEL', True),
-                          ('cv2.CAP_PROP_AUTO_WB', True),
-                          ('cv2.CAP_PROP_WB_TEMPERATURE', True)
-                          ]
-
-    for nm, v in capture_properties:
-        if v:
-            print(nm, video_cap.get(eval(nm)))
-
-
-def set_camera_properties(video_cap):
-    # capture_properties = [('cv2.CAP_PROP_FRAME_WIDTH', 1280),
-    #                       ('cv2.CAP_PROP_FRAME_HEIGHT', 720)
-    #                       ]
-
-    capture_properties = [('cv2.CAP_PROP_FRAME_WIDTH', 640),
-                          ('cv2.CAP_PROP_FRAME_HEIGHT', 480)
-                          ]
-
-    for nm, v in capture_properties:
-        if not video_cap.set(eval(nm), v):
-            print('Unable to set', nm, v)
 
 
 # Surprisingly, there is no skeletonization method in OpenCV. It seems common
@@ -691,8 +626,8 @@ def gauge_vision_setup():
         print('camera is not open')
         sys.exit(1)
 
-    set_camera_properties(video_capture)
-    # list_camera_properties(video_capture)
+    camera.set_camera_properties(video_capture, '640x480')
+    # camera.list_camera_properties(video_capture)
 
     return video_capture
 
