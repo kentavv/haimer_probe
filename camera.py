@@ -23,6 +23,8 @@
 
 import sys
 
+import cv2
+
 
 def list_camera_properties(video_cap):
     capture_properties = [('cv2.CAP_PROP_POS_MSEC', True),
