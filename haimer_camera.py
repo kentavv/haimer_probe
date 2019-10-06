@@ -51,6 +51,7 @@ import numpy as np
 import camera
 
 c_camera_name = 'HaimerCamera'
+c_demo_mode = True
 
 c_haimer_ball_diam = 4.  # millimeters
 
@@ -88,6 +89,10 @@ c_line_s = 2
 
 c_center_offset = [18, -6]
 c_image_center = lambda w, h: (w // 2 + c_center_offset[0], h // 2 + c_center_offset[1])
+
+
+class InvalidImage(Exception):
+    pass
 
 
 class QuitException(Exception):
@@ -450,18 +455,38 @@ def display_error(s):
     _error_str = s
 
 
-@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, save=False, record=False, record_ind=0, debug_view=False)
+@static_vars(ind=0)
+def next_frame(video_capture):
+    if not c_demo_mode:
+        retval, image0 = video_capture.read()
+    else:
+        for _ in range(2):
+            # fn = 'tests/haimer_camera/640x480/mov_raw_{:06d}.ppm'.format(next_frame.ind)
+            fn = 'tests/haimer_camera/640x480/h-2.png'
+            if os.path.exists(fn):
+                break
+            next_frame.ind = 0
+
+        retval, image0 = 1, cv2.imread(fn, -1)
+        next_frame.ind += 1
+
+        # image0 = cv2.rotate(image0, cv2.ROTATE_180)
+
+    if not retval:
+        print('rv is false')
+        raise InvalidImage
+    if image0.size == 0:
+        print('image0 is empty')
+        raise InvalidImage
+
+    return image0
+
+
+@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, save=False, record=False, record_ind=0, debug_view=False, standalone=False)
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
 
-    retval, image0 = video_capture.read()
-    if not retval:
-        print('rv is false')
-        sys.exit(1)
-    if image0.size == 0:
-        print('image0 is empty')
-        sys.exit(1)
-
+    image0 = next_frame(video_capture)
     h, w = image0.shape[:2]
     image_center = c_image_center(w, h)
 
@@ -521,7 +546,8 @@ def get_measurement(video_capture):
 
         draw_labels(image2, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final)
 
-    draw_fps(image2)
+    if get_measurement.standalone:
+        draw_fps(image2)
 
     # Build and display composite image
     img_all0 = np.vstack([image0, image1, image2])
@@ -635,6 +661,7 @@ def main():
     np.set_printoptions(precision=2)
 
     video_capture = gauge_vision_setup()
+    get_measurement.standalone = True
 
     while True:
         try:
