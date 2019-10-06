@@ -36,6 +36,7 @@ import numpy as np
 
 import camera
 import common
+from common import next_frame
 
 c_camera_name = 'Z-Camera'
 c_demo_mode = True
@@ -304,30 +305,13 @@ def draw_path(img, circles, start_pt, end_pt, cur_pt):
         cv2.circle(img, pt, sz, c, 3, lineType=cv2.LINE_AA)
 
 
-@common.static_vars(ind=0)
-def next_frame(video_capture):
-    if not c_demo_mode:
-        retval, image0 = video_capture.read()
-    else:
-        # for _ in range(2):
-        #     # fn = 'tests/z_camera/1280x720/mov_raw_{:06d}.ppm'.format(next_frame.ind)
-        #     if os.path.exists(fn):
-        #         break
-        #     next_frame.ind = 0
-        # fn = 'tests/z_camera/1280x720/holes.png'
+def next_frame2(video_capture):
+    if c_demo_mode:
         fn = 'tests/z_camera/1280x720/holes_and_slots.png'
-
-        retval, image0 = 1, cv2.imread(fn, -1)
-        next_frame.ind += 1
-
-        image0 = cv2.rotate(image0, cv2.ROTATE_180)
-
-    if not retval:
-        print('rv is false')
-        raise common.InvalidImage
-    if image0.size == 0:
-        print('image0 is empty')
-        raise common.InvalidImage
+        # fn_pat = 'tests/z_camera/1280x720/mov_raw_{:06d}.ppm'
+        image0 = next_frame(video_capture, fn=fn)
+    else:
+        image0 = next_frame(video_capture)
 
     return image0
 
@@ -360,7 +344,7 @@ def draw_selected_points(img, pts, c=(0, 0, 255), t=1):
                     standalone=False)
 def get_measurement(video_capture):
     if not get_measurement.pause_updates:
-        image0 = next_frame(video_capture)
+        image0 = next_frame2(video_capture)
         get_measurement.last_frame = image0
     else:
         image0 = get_measurement.last_frame

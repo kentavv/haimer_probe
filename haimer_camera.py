@@ -49,6 +49,7 @@ import numpy as np
 
 import camera
 import common
+from common import next_frame
 
 c_camera_name = 'HaimerCamera'
 c_demo_mode = True
@@ -405,29 +406,13 @@ def draw_labels(image, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final)
     cv2.putText(image, '{:6.3f} mm'.format(mm_final), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
 
 
-@common.static_vars(ind=0)
-def next_frame(video_capture):
-    if not c_demo_mode:
-        retval, image0 = video_capture.read()
-    else:
-        # for _ in range(2):
-        #     fn = 'tests/haimer_camera/640x480/mov_raw_{:06d}.ppm'.format(next_frame.ind)
-        #     if os.path.exists(fn):
-        #         break
-        #     next_frame.ind = 0
-
+def next_frame2(video_capture):
+    if c_demo_mode:
         fn = 'tests/haimer_camera/640x480/h-2.png'
-        retval, image0 = 1, cv2.imread(fn, -1)
-        next_frame.ind += 1
-
-        # image0 = cv2.rotate(image0, cv2.ROTATE_180)
-
-    if not retval:
-        print('rv is false')
-        raise common.InvalidImage
-    if image0.size == 0:
-        print('image0 is empty')
-        raise common.InvalidImage
+        # fn_pat = 'tests/haimer_camera/640x480/mov_raw_{:06d}.ppm'
+        image0 = next_frame(video_capture, fn=fn)
+    else:
+        image0 = next_frame(video_capture)
 
     return image0
 
@@ -436,7 +421,7 @@ def next_frame(video_capture):
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
 
-    image0 = next_frame(video_capture)
+    image0 = next_frame2(video_capture)
     h, w = image0.shape[:2]
     image_center = c_image_center(w, h)
 

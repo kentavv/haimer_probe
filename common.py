@@ -23,6 +23,7 @@
 
 from __future__ import print_function
 
+import os
 import time
 
 import cv2
@@ -103,3 +104,30 @@ def draw_error(img, s_=None):
 
         text_pos = ((img.shape[1] - text_size[0]) // 2, (img.shape[0] + text_size[1]) // 2)
         cv2.putText(img, s, text_pos, c_label_font_error, c_label_s_error, c_label_color_error, thickness)
+
+
+@static_vars(ind=0)
+def next_frame(video_capture, fn='', fn_pattern=''):
+    if not fn and not fn_pattern:
+        retval, image0 = video_capture.read()
+    else:
+        if not fn and fn_pattern:
+            for _ in range(2):
+                # 'tests/haimer_camera/640x480/mov_raw_{:06d}.ppm'
+                # 'tests/z_camera/1280x720/mov_raw_{:06d}.ppm'
+                fn = fn_pattern.format(next_frame.ind)
+                if os.path.exists(fn):
+                    break
+                next_frame.ind = 0
+
+        retval, image0 = 1, cv2.imread(fn, -1)
+        next_frame.ind += 1
+
+    if not retval:
+        print('rv is false')
+        raise InvalidImage
+    if image0.size == 0:
+        print('image0 is empty')
+        raise InvalidImage
+
+    return image0
