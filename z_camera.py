@@ -54,7 +54,8 @@ c_incomplete_color = (0, 0, 200)
 c_line_s = 2
 
 c_crop_rect = None
-c_machine_rect = [[0.0, 0.0], [4.266, 3.0]]
+# c_machine_rect = [[0.0, 0.0], [4.266, 3.0]]
+c_machine_rect = [[0.0, 0.0], []]
 
 
 def min_path(lst, start_pt=None, end_pt=None):
@@ -184,7 +185,7 @@ def find_holes(image):
         lst = []
 
         global c_crop_rect, c_machine_rect
-        if circles and c_crop_rect and c_machine_rect:
+        if circles and c_crop_rect and c_machine_rect and c_machine_rect[1]:
             pt0 = c_crop_rect[0]
             mpt0 = c_machine_rect[0]
 
@@ -267,8 +268,9 @@ def draw_path(img, circles, start_pt, end_pt, cur_pt, path_locked):
 
     w = c_crop_rect[1][0] - c_crop_rect[0][0]
     h = c_crop_rect[1][1] - c_crop_rect[0][1]
-    mw = c_machine_rect[1][0] - c_machine_rect[0][0]
-    mh = c_machine_rect[1][1] - c_machine_rect[0][1]
+    if c_machine_rect[1]:
+        mw = c_machine_rect[1][0] - c_machine_rect[0][0]
+        mh = c_machine_rect[1][1] - c_machine_rect[0][1]
 
     def mpt_to_pt(mpt):
         x = (mpt[0] - mpt0[0]) / mw * w + pt0[0]
@@ -283,7 +285,8 @@ def draw_path(img, circles, start_pt, end_pt, cur_pt, path_locked):
 
     try:
         lst = [round_pt(x[0][0]) for x in circles]
-        lst = [mpt_to_pt(start_pt)] + lst + [mpt_to_pt(end_pt)]
+        if c_machine_rect[1]:
+            lst = [mpt_to_pt(start_pt)] + lst + [mpt_to_pt(end_pt)]
     except IndexError:
         pass
     else:
@@ -293,7 +296,7 @@ def draw_path(img, circles, start_pt, end_pt, cur_pt, path_locked):
             c = c_path_color if path_locked else c_incomplete_color
             cv2.line(img, pt1, pt2, c, thickness=c_line_s, lineType=cv2.LINE_AA)
 
-    if cur_pt is not None:
+    if c_machine_rect[1] and cur_pt is not None:
         sz = mpt_to_pt_z(cur_pt)
         if sz >= 0:
             c = (0, 255, 255)
@@ -466,7 +469,7 @@ def get_measurement(video_capture):
     if in_alignment:
         ss = 'Enter plate dimensions (W,H): ' + process_key.plate_size_str
         cv2.putText(final_img, ss, (20, 30), c_label_font, c_label_s, c_label_color)
-    else:
+    elif c_machine_rect[1]:
         cv2.putText(final_img, 'Size (WxH): {:.3f} x {:.3f}'.format(*c_machine_rect[1]), (20, 30), c_label_font, c_label_s, c_label_color)
 
     if get_measurement.standalone:
