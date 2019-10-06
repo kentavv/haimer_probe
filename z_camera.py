@@ -440,8 +440,6 @@ def get_measurement(video_capture):
     if c_crop_rect:
         cv2.rectangle(image_b, round_pt(c_crop_rect[0]), round_pt(c_crop_rect[1]), c_line_color, c_line_s)
 
-    global c_view
-
     # Build and display composite image
     final_img = None
     if get_measurement.c_view == 0:
