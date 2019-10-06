@@ -590,33 +590,33 @@ def machine_to_part_cs(machine_pos=None):
     return nm
 
 
-def go():
-    global cnc_s
-    global cnc_c
-
-    cnc_s.poll()
-    print(dir(cnc_s))
-    print(dir(cnc_c))
-    print(cnc_s.g5x_index)
-    print(cnc_s.tool_in_spindle)
-    print(cnc_s.linear_units)
-
-    tool_off = cnc_s.tool_offset[:3]
-    g92_off = cnc_s.g92_offset[:3]
-    g5x_off = cnc_s.g5x_offset[:3]
-    machine_pos = cnc_s.position[:3]
-
-    print('tool_off', tool_off)
-    print('g92_off', g92_off)
-    print('g5x_off', g5x_off)
-    print('machine_pos (relative to home position)', machine_pos)
-    print('axis_input', [cnc_s.axis[i]['input'] for i in range(3)])
-    print('axis_output', [cnc_s.axis[i]['output'] for i in range(3)])
-
-    print('part_to_machine_cs([0,0,0])', part_to_machine_cs([0, 0, 0]))
-    print('machine_to_part_cs()', machine_to_part_cs())
-
-    return machine_to_part_cs()
+# def go():
+#     global cnc_s
+#     global cnc_c
+# 
+#     cnc_s.poll()
+#     print(dir(cnc_s))
+#     print(dir(cnc_c))
+#     print(cnc_s.g5x_index)
+#     print(cnc_s.tool_in_spindle)
+#     print(cnc_s.linear_units)
+# 
+#     tool_off = cnc_s.tool_offset[:3]
+#     g92_off = cnc_s.g92_offset[:3]
+#     g5x_off = cnc_s.g5x_offset[:3]
+#     machine_pos = cnc_s.position[:3]
+# 
+#     print('tool_off', tool_off)
+#     print('g92_off', g92_off)
+#     print('g5x_off', g5x_off)
+#     print('machine_pos (relative to home position)', machine_pos)
+#     print('axis_input', [cnc_s.axis[i]['input'] for i in range(3)])
+#     print('axis_output', [cnc_s.axis[i]['output'] for i in range(3)])
+# 
+#     print('part_to_machine_cs([0,0,0])', part_to_machine_cs([0, 0, 0]))
+#     print('machine_to_part_cs()', machine_to_part_cs())
+# 
+#     return machine_to_part_cs()
 
 
 # Machine Coordinates (G53)
@@ -711,12 +711,6 @@ def re_holes(video_capture, circles):
 
 
 def main():
-    # if len(sys.argv) != 1 + 3 * 3:
-    #     print(f'usage: {sys.argv[0]} <xs> <xe> <xd>  <ys> <ye> <yd>  <zs> <ze> <zd>')
-    #     sys.exit(1)
-    #
-    # args = map(float, sys.argv[1:])
-
     global cnc_s
     global cnc_c
 
@@ -744,6 +738,9 @@ def main():
 
     while True:
         try:
+            lst = machine_to_part_cs()
+            z_camera.get_measurement.start_mpt = lst[:2]
+
             mm_final = haimer_camera.get_measurement(video_capture)
             circles = z_camera.get_measurement(video_capture2)
             key = cv2.waitKey(5)
@@ -758,7 +755,7 @@ def main():
             except KeyError:
                 pass
 
-            if key == ord('l'):
+            if key == ord('G'):
                 results = re_holes(video_capture, circles)
 
                 print
@@ -768,10 +765,6 @@ def main():
                     print(res)
                
                 print
-            elif key == ord('g'):
-                lst = go()
-                print(lst)
-                z_camera.get_measurement.start_mpt = lst[:2]
 
         except OvershootException as e:
             cnc_c.abort()
