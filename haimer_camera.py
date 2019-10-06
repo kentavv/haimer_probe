@@ -40,12 +40,12 @@
 
 from __future__ import print_function
 
-import math
 import os
 import sys
 import time
 
 import cv2
+import math
 import numpy as np
 
 import camera
@@ -58,7 +58,7 @@ c_haimer_ball_diam = 4.  # millimeters
 c_dial_outer_mask_r = 220
 
 c_red_angle_start = 1.9170124625343092
-c_red_angle_end = c_red_angle_start + 2.5120631002707458 # = -1.8894180264975993 + 2 * math.pi - c_red_angle_start
+c_red_angle_end = c_red_angle_start + 2.5120631002707458  # = -1.8894180264975993 + 2 * math.pi - c_red_angle_start
 c_initial_image_rot = -.07513945576152618354
 
 c_rho_resolution = 1 / 2.  # 1/2 pixel
@@ -636,7 +636,7 @@ def process_key(key):
         elif key == 84:  # KEY_DOWN
             c_center_offset[1] += 1
         print('c_center_offset:', c_center_offset)
-    elif key in [27, ord('q')]: # Escape or q
+    elif key in [27, ord('q')]:  # Escape or q
         raise QuitException
     elif key >= 0:
         # print(key)

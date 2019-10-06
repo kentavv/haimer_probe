@@ -23,8 +23,6 @@
 
 import sys
 
-import cv2
-
 
 def list_camera_properties(video_cap):
     capture_properties = [('cv2.CAP_PROP_POS_MSEC', True),
@@ -95,4 +93,3 @@ def set_camera_properties(video_cap, res):
     for nm, v in capture_properties:
         if not video_cap.set(eval(nm), v):
             print('Unable to set', nm, v)
-

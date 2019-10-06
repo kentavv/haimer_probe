@@ -49,8 +49,8 @@ import sys
 import time
 
 import cv2
-import numpy as np
 import linuxcnc
+import numpy as np
 
 import haimer_camera
 import z_camera
@@ -68,6 +68,7 @@ c_label_color = (0, 255, 0)
 c_label_s = .8
 
 video_capture2 = None
+
 
 class InvalidImage(Exception):
     pass
@@ -612,8 +613,8 @@ def part_to_machine_cs(pt):
     g5x_off = cnc_s.g5x_offset[:3]
     machine_pos = cnc_s.position[:3]
 
-# position + tool_off + g5x_off + g92_off = machine_pos
-# position = machine_pos - g92_off - g5x_off - tool_off
+    # position + tool_off + g5x_off + g92_off = machine_pos
+    # position = machine_pos - g92_off - g5x_off - tool_off
     nm = [pt[i] + tool_off[i] + g5x_off[i] + g92_off[i] for i in range(3)]
     return nm
 
@@ -628,8 +629,8 @@ def machine_to_part_cs(machine_pos=None):
     if machine_pos is None:
         machine_pos = cnc_s.position[:3]
 
-# position + tool_off + g5x_off + g92_off = machine_pos
-# position = machine_pos - g92_off - g5x_off - tool_off
+    # position + tool_off + g5x_off + g92_off = machine_pos
+    # position = machine_pos - g92_off - g5x_off - tool_off
     nm = [machine_pos[i] - g92_off[i] - g5x_off[i] - tool_off[i] for i in range(3)]
     return nm
 
@@ -673,31 +674,31 @@ def machine_to_part_cs(machine_pos=None):
 # g92_off contains offsets of the origin, they are added to commanded position to produce a machine position (global coordinate system) (persistent)
 # g5x_off contains offsets of the origin, they are added to commanded position to produce a machine position (local or part coordinate system) (persistent)
 
-#1
-#53
-#0.0393700787402
-#('tool_off', (0.0, 0.0, 3.652))
-#('g92_off', (0.0, 0.0, 0.0))
-#('g5x_off', (1.3769656307399998, -2.31421642429, -8.739318121759998))
-#('machine_pos', (2.951150911092579, -0.3856613977556656, 0.017924044147022797))
+# 1
+# 53
+# 0.0393700787402
+# ('tool_off', (0.0, 0.0, 3.652))
+# ('g92_off', (0.0, 0.0, 0.0))
+# ('g5x_off', (1.3769656307399998, -2.31421642429, -8.739318121759998))
+# ('machine_pos', (2.951150911092579, -0.3856613977556656, 0.017924044147022797))
 # 1.5742 1.9285 5.1051
 
-#1
-#100
-#0.0393700787402
-#('tool_off', (0.0, 0.0, 4.776))
-#('g92_off', (0.0, 0.0, 0.0))
-#('g5x_off', (1.3769656307399998, -2.31421642429, -8.739318121759998))
-#('machine_pos (relative to home position)', (2.951150911092579, -0.3856613977556656, 0.017924044147022797))
+# 1
+# 100
+# 0.0393700787402
+# ('tool_off', (0.0, 0.0, 4.776))
+# ('g92_off', (0.0, 0.0, 0.0))
+# ('g5x_off', (1.3769656307399998, -2.31421642429, -8.739318121759998))
+# ('machine_pos (relative to home position)', (2.951150911092579, -0.3856613977556656, 0.017924044147022797))
 # 1.5742 1.9285 3.9811
 
-#1
-#100
-#0.0393700787402
-#('tool_off', (0.0, 0.0, 4.776))
-#('g92_off', (0.0, 0.0, 0.0))
-#('g5x_off', (1.3769656307399998, -2.31421642429, -8.739318121759998))
-#('machine_pos (relative to home position)', (2.951150911092579, -0.3856613977556656, -0.8220035369112901))
+# 1
+# 100
+# 0.0393700787402
+# ('tool_off', (0.0, 0.0, 4.776))
+# ('g92_off', (0.0, 0.0, 0.0))
+# ('g5x_off', (1.3769656307399998, -2.31421642429, -8.739318121759998))
+# ('machine_pos (relative to home position)', (2.951150911092579, -0.3856613977556656, -0.8220035369112901))
 # 1.5742 1.9285 3.1413
 
 
@@ -740,7 +741,7 @@ def re_holes(video_capture, circles):
             cpt, _, delta, diam2 = find_center_of_hole(video_capture)
             ll = machine_to_part_cs(cpt)
             ll2 = machine_to_part_cs()
-            results += [(lbl, time.time()-t0, x, y, ll[0], ll[1], ll2[0], ll2[1], diam, diam2, abs(delta[0]), abs(delta[1]))]
+            results += [(lbl, time.time() - t0, x, y, ll[0], ll[1], ll2[0], ll2[1], diam, diam2, abs(delta[0]), abs(delta[1]))]
             x, y = ll[:2]
             # time.sleep(.25)
             for i in range(10):
@@ -755,7 +756,7 @@ def re_holes(video_capture, circles):
 
 
 def click_and_crop(event, x0, y0, flags, param):
-    c_final_image_scale_factor = 1280/1920.
+    c_final_image_scale_factor = 1280 / 1920.
     x = int(round(x0 / c_final_image_scale_factor))
     y = int(round(y0 / c_final_image_scale_factor))
 
@@ -817,8 +818,8 @@ def update_view(video_capture, video_capture2):
         text_size, baseline = cv2.getTextSize(s, c_label_font, c_label_s, thickness)
         text_pos = ((final_img.shape[1] - text_size[0]) // 2, (final_img.shape[0] + text_size[1]) // 2)
         cv2.putText(final_img, s, text_pos, c_label_font, c_label_s, c_label_color, thickness)
-        
-    c_final_image_scale_factor = 1280/1920.
+
+    c_final_image_scale_factor = 1280 / 1920.
     final_img_resized = cv2.resize(final_img, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
     cv2.imshow(c_camera_name, final_img_resized)
@@ -865,9 +866,9 @@ def update_view(video_capture, video_capture2):
         print('results += [(lbl, time.time()-t0, x, y, ll[0], ll[1], ll2[0], ll2[1], diam, diam2, abs(delta[0]), abs(delta[1]))]')
         for res in results:
             print(res)
-       
+
         print
-    elif key in [27, ord('q')]: # Escape or q
+    elif key in [27, ord('q')]:  # Escape or q
         raise QuitException
     else:
         accepted = False
