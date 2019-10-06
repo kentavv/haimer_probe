@@ -484,6 +484,8 @@ def get_measurement(video_capture):
 
         draw_labels(image2, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final)
 
+    img_all, img_all_resized = None, None
+
     if build_all:
         # Build and display composite image
         img_all0 = np.vstack([image0, image1, image2])
