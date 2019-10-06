@@ -11,7 +11,7 @@ Examples of use are shown at: https://www.youtube.com/watch?v=w3novypPqos
 * p: toggle display updates, image analysis continues
 * r: toggle recording raw and displayed frames (overwriting)
 * s: save current raw and displayed frames (non-overwriting)
-* t: toggle tare calculations
+* z: toggle tare (zeroing) calculations
 * d: toggle debug view stages of image analysis
 * q: quit
 * KEY_LEFT: move pivot point to the left
@@ -33,6 +33,8 @@ These commands are in addition to those inherited from haimer_camera.py (highest
 
 The additional commands are best seen on a numeric keypad. The direction shown on the keypad indicates the direction the probe approaches the part.
 
+* g: probe the dimensions of all the holes found by z_camera.py
+* t: toggle touch-off mode, if touch-off mode is active, the following commands have priority
 * 0: find center of hole, internal edges
 * 4: find edge moving to the left, -x
 * 6: find edge moving to the right, +x
@@ -43,7 +45,6 @@ The additional commands are best seen on a numeric keypad. The direction shown o
 * 3: find upper-left corner, moving to the right, then around the corner, and then towards the operator
 * 7: find lower-right corner, moving to the left, then around the corner, and then away from the operator
 * 9: find lower-left corner, moving to the right, then around the corner, and then away from the operator
-* G: probe the dimensions of all the holes found by z_camera.py
 
 ## Some references
 http://www.insticc.org/Primoris/Resources/PaperPdf.ashx?idPaper=73860
