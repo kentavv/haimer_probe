@@ -1,3 +1,4 @@
+*.csv
 *.sw?
 *.ppm
 *.pgm
