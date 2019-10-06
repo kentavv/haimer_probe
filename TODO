@@ -1,2 +1,4 @@
+* Improve documentation
 * An on-screen for selecting edge-finding direction.
-* Sometimes, there is oscillation around the gauge reading 0 (solved now or just less frequent?)
+* Sometimes there is oscillation around the gauge reading 0 (solved now or just less frequent?)
+* Sometimes there is overshoot past the gauge reading 0. This started after merging the two views and updating more frequently. The overshoot may be being caused by an insufficient update rate. The new code minimizing image creation following locking the set of circles may be enough. Slowing the feedrate might also help.
