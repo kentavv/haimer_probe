@@ -42,13 +42,13 @@ from __future__ import print_function
 
 import os
 import sys
-import time
 
 import cv2
 import math
 import numpy as np
 
 import camera
+import common
 
 c_camera_name = 'HaimerCamera'
 c_demo_mode = True
@@ -89,33 +89,6 @@ c_line_s = 2
 
 c_center_offset = [18, -6]
 c_image_center = lambda w, h: (w // 2 + c_center_offset[0], h // 2 + c_center_offset[1])
-
-
-class InvalidImage(Exception):
-    pass
-
-
-class QuitException(Exception):
-    pass
-
-
-# Decorator for static variables, from
-# https://stackoverflow.com/questions/279561/what-is-the-python-equivalent-of-static-variables-inside-a-function
-def static_vars(**kwargs):
-    def decorate(func):
-        for k in kwargs:
-            setattr(func, k, kwargs[k])
-        return func
-
-    return decorate
-
-
-def append_v(lst, v, n=1):
-    if v is None:
-        return lst
-    if len(lst) > n:
-        lst.pop(0)
-    lst.append(v)
 
 
 def mean_angles(lst):
@@ -265,7 +238,7 @@ def summarize_lines(lines, image_center):
     return theta
 
 
-def black_arrow_mask(image, image_center):
+def gen_black_arrow_mask(image, image_center):
     mask = np.zeros(image.shape, dtype=image.dtype)
 
     # cv2.circle(mask, image_center, c_black_outer_mask_r, (255, 255, 255), -1)
@@ -276,7 +249,7 @@ def black_arrow_mask(image, image_center):
     return mask
 
 
-def red_arrow_mask(image, image_center):
+def gen_red_arrow_mask(image, image_center):
     mask = np.zeros(image.shape, dtype=image.dtype)
 
     cv2.circle(mask, image_center, c_red_outer_mask_r, (255, 255, 255), -1)
@@ -286,7 +259,7 @@ def red_arrow_mask(image, image_center):
 
 
 def black_arrow_segment(image, image_center):
-    mask = black_arrow_mask(image, image_center)
+    mask = gen_black_arrow_mask(image, image_center)
     image = cv2.bitwise_and(image, mask)
 
     if False:
@@ -320,7 +293,7 @@ def black_arrow_segment(image, image_center):
 
 
 def red_arrow_segment(image, image_center):
-    mask = red_arrow_mask(image, image_center)
+    mask = gen_red_arrow_mask(image, image_center)
     image = cv2.bitwise_and(image, mask)
 
     if True:
@@ -376,13 +349,13 @@ def red_arrow(image, image_center):
     return arrow_common(image, image_center, red_arrow_segment, c_red_hough_threshold, c_red_hough_min_line_length, c_red_hough_max_line_gap, c_red_drawn_line_length)
 
 
-@static_vars(tare_lst=[], tare_on=False)
+@common.static_vars(tare_lst=[], tare_on=False)
 def calc_mm(theta_b, theta_r):
     # Blend the course and find measurements of the red and black hands,
     # respectively and return final measurement.
 
     if calc_mm.tare_on:
-        append_v(calc_mm.tare_lst, (theta_b, theta_r), 200)
+        common.append_v(calc_mm.tare_lst, (theta_b, theta_r), 200)
         print('Tare', len(calc_mm.tare_lst), mean_angles([x[0] for x in calc_mm.tare_lst]), mean_angles([x[1] for x in calc_mm.tare_lst]))
 
     # Thetas come in as [0, Pi] and [-Pi, 0] so change that to [0, 2Pi]
@@ -432,41 +405,18 @@ def draw_labels(image, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final)
     cv2.putText(image, '{:6.3f} mm'.format(mm_final), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
 
 
-@static_vars(fps_lst=[], fps_t1=None)
-def draw_fps(image):
-    if draw_fps.fps_t1 is None:
-        draw_fps.fps_t1 = time.time()
-        return
-    t2 = time.time()
-    append_v(draw_fps.fps_lst, 1. / (t2 - draw_fps.fps_t1), 90)
-    draw_fps.fps_t1 = t2
-
-    fps = np.mean(draw_fps.fps_lst)
-
-    # cv2.putText(image, f'{fps:.2f} fps', (20, 30 * 2), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image, '{:.2f} fps'.format(fps), (20, 30 * 2), c_label_font, c_label_s, c_label_color)
-
-
-_error_str = ''
-
-
-def display_error(s):
-    global _error_str
-    _error_str = s
-
-
-@static_vars(ind=0)
+@common.static_vars(ind=0)
 def next_frame(video_capture):
     if not c_demo_mode:
         retval, image0 = video_capture.read()
     else:
-        for _ in range(2):
-            # fn = 'tests/haimer_camera/640x480/mov_raw_{:06d}.ppm'.format(next_frame.ind)
-            fn = 'tests/haimer_camera/640x480/h-2.png'
-            if os.path.exists(fn):
-                break
-            next_frame.ind = 0
+        # for _ in range(2):
+        #     fn = 'tests/haimer_camera/640x480/mov_raw_{:06d}.ppm'.format(next_frame.ind)
+        #     if os.path.exists(fn):
+        #         break
+        #     next_frame.ind = 0
 
+        fn = 'tests/haimer_camera/640x480/h-2.png'
         retval, image0 = 1, cv2.imread(fn, -1)
         next_frame.ind += 1
 
@@ -474,15 +424,15 @@ def next_frame(video_capture):
 
     if not retval:
         print('rv is false')
-        raise InvalidImage
+        raise common.InvalidImage
     if image0.size == 0:
         print('image0 is empty')
-        raise InvalidImage
+        raise common.InvalidImage
 
     return image0
 
 
-@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, save=False, record=False, record_ind=0, debug_view=False, standalone=False)
+@common.static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, save=False, record=False, record_ind=0, debug_view=False, standalone=False)
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
 
@@ -505,8 +455,8 @@ def get_measurement(video_capture):
     # Maintain a list of valid thetas for times when no measurements are
     # available, such as when the black hand passes over the red hand, and
     # to use for noise reduction.
-    append_v(get_measurement.theta_b_l, theta_b)
-    append_v(get_measurement.theta_r_l, theta_r)
+    common.append_v(get_measurement.theta_b_l, theta_b)
+    common.append_v(get_measurement.theta_r_l, theta_r)
 
     if get_measurement.theta_b_l and get_measurement.theta_r_l:
         theta_b = mean_angles(get_measurement.theta_b_l)
@@ -515,7 +465,7 @@ def get_measurement(video_capture):
         mm_final, mm_b, mm_r = calc_mm(theta_b, theta_r)
 
     # Draw outer circle dial and crosshairs on dial pivot.
-    cv2.circle(image1, (image_center), c_dial_outer_mask_r, c_line_color, c_line_s)
+    cv2.circle(image1, image_center, c_dial_outer_mask_r, c_line_color, c_line_s)
     cv2.line(image1,
              (image_center[0] - c_inner_mask_r, image_center[1] - c_inner_mask_r),
              (image_center[0] + c_inner_mask_r, image_center[1] + c_inner_mask_r),
@@ -546,37 +496,28 @@ def get_measurement(video_capture):
 
         draw_labels(image2, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final)
 
-    if get_measurement.standalone:
-        draw_fps(image2)
-
     # Build and display composite image
     img_all0 = np.vstack([image0, image1, image2])
     img_all1 = np.vstack([seg_b, skel_b, image_b])
     img_all2 = np.vstack([seg_r, skel_r, image_r])
     img_all = np.hstack([img_all0, img_all1, img_all2])
-    img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
     img_b = cv2.resize(image_b, None, fx=0.5, fy=0.5)
     img_r = cv2.resize(image_r, (image2.shape[1] - img_b.shape[1], image2.shape[0] - img_b.shape[0]))
     img_simple = np.vstack([image2, np.hstack([img_b, img_r])])
+
+    if get_measurement.standalone:
+        common.draw_fps(img_all)
+        common.draw_fps(img_simple, append_t=False)
+
+    img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
     if get_measurement.debug_view:
         final_img = img_all_resized
     else:
         final_img = img_simple
 
-    if _error_str:
-        s = 'WARNING: ' + _error_str
-
-        c_label_font_error = cv2.FONT_HERSHEY_SIMPLEX
-        c_label_color_error = (0, 0, 255)
-        c_label_s_error = 1.5
-
-        thickness = 3
-        text_size, baseline = cv2.getTextSize(s, c_label_font_error, c_label_s_error, thickness)
-
-        text_pos = ((final_img.shape[1] - text_size[0]) // 2, (final_img.shape[0] + text_size[1]) // 2)
-        cv2.putText(final_img, s, text_pos, c_label_font_error, c_label_s_error, c_label_color_error, thickness)
+    common.draw_error(final_img)
 
     if get_measurement.record:
         fn1 = 'mov_raw_h_{:06}.ppm'.format(get_measurement.record_ind)
@@ -637,7 +578,7 @@ def process_key(key):
             c_center_offset[1] += 1
         print('c_center_offset:', c_center_offset)
     elif key in [27, ord('q')]:  # Escape or q
-        raise QuitException
+        raise common.QuitException
     elif key >= 0:
         # print(key)
         return False
@@ -674,7 +615,7 @@ def main():
             key = cv2.waitKey(5) & 0xff
             process_key(key)
             # print('mm_final:', mm_final)
-        except QuitException:
+        except common.QuitException:
             break
 
 

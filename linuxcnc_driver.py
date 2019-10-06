@@ -54,6 +54,7 @@ import numpy as np
 
 import haimer_camera
 import z_camera
+import common
 
 c_slow_dwell = 2.
 c_fast_dwell = .5
@@ -68,14 +69,6 @@ c_label_color = (0, 255, 0)
 c_label_s = .8
 
 video_capture2 = None
-
-
-class InvalidImage(Exception):
-    pass
-
-
-class QuitException(Exception):
-    pass
 
 
 class OvershootException(Exception):
@@ -94,19 +87,6 @@ class NotReady(Exception):
     def __str__(self):
         s = 'Not ready for MDI, not homed?'
         return s
-
-
-# Decorator for static variables, from
-
-# Decorator for static variables, from
-# https://stackoverflow.com/questions/279561/what-is-the-python-equivalent-of-static-variables-inside-a-function
-def static_vars(**kwargs):
-    def decorate(func):
-        for k in kwargs:
-            setattr(func, k, kwargs[k])
-        return func
-
-    return decorate
 
 
 def move_to(x, y, z, feedrate=None):
@@ -134,27 +114,27 @@ def move_to(x, y, z, feedrate=None):
 # l: recursion depth
 # p: vector containing current position
 # rv: vector containing accumulated positions
-def gen_grid_(s, d, n, o, l, p, rv):
-    if l == len(p):
+def gen_grid_(s, d, n, o, rd, p, rv):
+    if rd == len(p):
         pp = [x for x in p]
         for i in range(len(pp)):
             pp[i] = s[i] + d[i] * pp[i]
         rv += [pp]
         return
 
-    for i in range(n[l]):
-        gen_grid_(s, d, n, o, l + 1, p, rv)
-        p[l] += o[l]
+    for i in range(n[rd]):
+        gen_grid_(s, d, n, o, rd + 1, p, rv)
+        p[rd] += o[rd]
 
-    if o[l] == 1:
-        o[l] = -1
-        p[l] = n[l] - 1
-    elif o[l] == -1:
-        o[l] = 1
-        p[l] = 0
+    if o[rd] == 1:
+        o[rd] = -1
+        p[rd] = n[rd] - 1
+    elif o[rd] == -1:
+        o[rd] = 1
+        p[rd] = 0
 
 
-# generate grid points in a zig-zag rectalinear pattern
+# generate grid points in a zig-zag rectilinear pattern
 # s: vector of start positions for each axis
 # e: vector of end positions for each axis
 # d: vector of step size for each axis
@@ -193,10 +173,6 @@ def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z, max_mm=1.0, local=Fals
         print('Converted:', [cmd_x, cmd_y, cmd_z])
 
     state = 0
-    d1 = None
-    d2 = None
-
-    vv_t = None
 
     start_x = None
     start_y = None
@@ -260,15 +236,11 @@ def find_edge(video_capture, direction):
 
     state = 0
     d1 = None
-    d2 = None
-
-    vv_t = None
+    in_state_3 = 0
 
     start_x = None
     start_y = None
     start_z = None
-
-    in_state_3 = 0
 
     while True:
         s = linuxcnc.stat()
@@ -308,9 +280,7 @@ def find_edge(video_capture, direction):
             # print('state', state, 'total_e:', total_e, 'in_final:', in_final, 'mm_final:', mm_final)
             print('state', state, 'in_final:', in_final, 'mm_final:', mm_final)
 
-            cmd_x = x
-            cmd_y = y
-            cmd_z = z
+            total_e = 0.
 
             if state == 0:
                 start_x = x
@@ -453,7 +423,7 @@ def find_corner(video_capture, direction):
     s = linuxcnc.stat()
     s.poll()
 
-    moving = is_moving(s)
+    # moving = is_moving(s)
 
     start_x = s.axis[0]['input']
     start_y = s.axis[1]['input']
@@ -485,6 +455,9 @@ def find_corner(video_capture, direction):
         _, _ = monitored_move_to(video_capture, edge_x[0] + ball_diam, start_y - 0.5, start_z)
         _, _ = monitored_move_to(video_capture, edge_x[0] - ball_diam, start_y - 0.5, start_z)
         edge_y, _ = find_forward_edge(video_capture)
+    else:
+        edge_x = []
+        edge_y = []
 
     s.poll()
 
@@ -527,7 +500,7 @@ def find_center_of_hole(video_capture):
     s = linuxcnc.stat()
     s.poll()
 
-    moving = is_moving(s)
+    # moving = is_moving(s)
 
     start_x = s.axis[0]['input']
     start_y = s.axis[1]['input']
@@ -611,7 +584,7 @@ def part_to_machine_cs(pt):
     tool_off = cnc_s.tool_offset[:3]
     g92_off = cnc_s.g92_offset[:3]
     g5x_off = cnc_s.g5x_offset[:3]
-    machine_pos = cnc_s.position[:3]
+    # machine_pos = cnc_s.position[:3]
 
     # position + tool_off + g5x_off + g92_off = machine_pos
     # position = machine_pos - g92_off - g5x_off - tool_off
@@ -702,6 +675,13 @@ def machine_to_part_cs(machine_pos=None):
 # 1.5742 1.9285 3.1413
 
 
+def camera_dwell(video_capture):
+    # time.sleep(.25)
+    for _ in range(10):
+        mm_final, circles = update_view(video_capture, video_capture2)
+        print(mm_final)
+
+
 def re_holes(video_capture, circles):
     part_z = 5.4 / 25.4
     # With a tight max_mm, it's likely to see false errors after the find_center_of_hole
@@ -724,7 +704,7 @@ def re_holes(video_capture, circles):
     for c in circles:
         print(c)
         if c[1]:
-            m_pt, diam = c[1]
+            # m_pt, diam = c[1]
             lst += [c[1]]
 
     results = []
@@ -743,10 +723,7 @@ def re_holes(video_capture, circles):
             ll2 = machine_to_part_cs()
             results += [(lbl, time.time() - t0, x, y, ll[0], ll[1], ll2[0], ll2[1], diam, diam2, abs(delta[0]), abs(delta[1]))]
             x, y = ll[:2]
-            # time.sleep(.25)
-            for i in range(10):
-                mm_final, circles = update_view(video_capture, video_capture2)
-                print(mm_final)
+            camera_dwell(video_capture)
             monitored_move_to(video_capture, x, y, zh, max_mm=max_mm, local=True, feedrate=c_feedrate_fast)
 
         (x, y), z = end_pt, zh
@@ -763,18 +740,10 @@ def click_and_crop(event, x0, y0, flags, param):
     z_camera.click_and_crop(event, x, y, flags, param)
 
 
-_error_str = ''
-
-
-def display_error(s):
-    global _error_str
-    _error_str = s
-
-
 c_camera_name = 'linuxcnc_driver'
 
 
-@static_vars(save=False, record=False, record_ind=0, do_touchoff=False)
+@common.static_vars(save=False, record=False, record_ind=0, do_touchoff=False)
 def update_view(video_capture, video_capture2):
     cmds = {ord('0'): touch_off_center_of_hole,
             ord('4'): touch_off_right_edge,
@@ -797,20 +766,9 @@ def update_view(video_capture, video_capture2):
     if haimer_img.shape == (1008, 1344, 3):
         haimer_img = cv2.resize(haimer_img, (960, 720))
     final_img = np.hstack([z_img, haimer_img])
-    z_camera.draw_fps(final_img)
+    common.draw_fps(final_img)
 
-    if _error_str:
-        s = 'WARNING: ' + _error_str
-
-        c_label_font_error = cv2.FONT_HERSHEY_SIMPLEX
-        c_label_color_error = (0, 0, 255)
-        c_label_s_error = 1.5
-
-        thickness = 3
-        text_size, baseline = cv2.getTextSize(s, c_label_font_error, c_label_s_error, thickness)
-
-        text_pos = ((final_img.shape[1] - text_size[0]) // 2, (final_img.shape[0] + text_size[1]) // 2)
-        cv2.putText(final_img, s, text_pos, c_label_font_error, c_label_s_error, c_label_color_error, thickness)
+    common.draw_error(final_img)
 
     if update_view.do_touchoff:
         s = 'Touch off using numeric keypad'
@@ -841,13 +799,13 @@ def update_view(video_capture, video_capture2):
                 print('Wrote image {}'.format(fn1))
                 break
 
-    accepted = False
+    # accepted = False
     if update_view.do_touchoff:
         try:
             res = cmds[key](video_capture)
             update_view.do_touchoff = False
             print(res)
-            accepted = True
+            # accepted = True
         except KeyError:
             pass
 
@@ -861,22 +819,22 @@ def update_view(video_capture, video_capture2):
     elif key == ord('g'):
         results = re_holes(video_capture, circles)
 
-        print
+        print()
 
         print('results += [(lbl, time.time()-t0, x, y, ll[0], ll[1], ll2[0], ll2[1], diam, diam2, abs(delta[0]), abs(delta[1]))]')
         for res in results:
             print(res)
 
-        print
+        print()
     elif key in [27, ord('q')]:  # Escape or q
-        raise QuitException
+        raise common.QuitException
     else:
         accepted = False
 
     if not accepted or key in [ord('r'), ord('s')]:
         accepted = haimer_camera.process_key(key)
     if not accepted or key in [ord('r'), ord('s')]:
-        accepted = z_camera.process_key(key)
+        z_camera.process_key(key)
 
     return mm_final, circles
 
@@ -897,13 +855,13 @@ def main():
 
     while True:
         try:
-            mm_final, circles = update_view(video_capture, video_capture2)
+            _ = update_view(video_capture, video_capture2)
         except OvershootException as e:
             cnc_c.abort()
-            display_error(str(e))
+            common.display_error(str(e))
         except NotReady as e:
-            display_error(str(e))
-        except (haimer_camera.InvalidImage, z_camera.InvalidImage, InvalidImage):
+            common.display_error(str(e))
+        except common.InvalidImage:
             s = linuxcnc.stat()
             s.poll()
 
@@ -913,7 +871,7 @@ def main():
             print('Invalid image', moving)
 
             sys.exit(1)
-        except (haimer_camera.QuitException, z_camera.QuitException, QuitException):
+        except common.QuitException:
             s = linuxcnc.stat()
             s.poll()
 

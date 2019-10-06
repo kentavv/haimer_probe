@@ -29,13 +29,13 @@ from __future__ import print_function
 
 import os
 import sys
-import time
 
 import cv2
 import math
 import numpy as np
 
 import camera
+import common
 
 c_camera_name = 'Z-Camera'
 c_demo_mode = True
@@ -52,33 +52,6 @@ c_line_s = 2
 
 c_crop_rect = None
 c_machine_rect = [[0.0, 0.0], [4.266, 3.0]]
-
-
-class InvalidImage(Exception):
-    pass
-
-
-class QuitException(Exception):
-    pass
-
-
-# Decorator for static variables, from
-# https://stackoverflow.com/questions/279561/what-is-the-python-equivalent-of-static-variables-inside-a-function
-def static_vars(**kwargs):
-    def decorate(func):
-        for k in kwargs:
-            setattr(func, k, kwargs[k])
-        return func
-
-    return decorate
-
-
-def append_v(lst, v, n=1):
-    if v is None:
-        return lst
-    if len(lst) > n:
-        lst.pop(0)
-    lst.append(v)
 
 
 def min_path(lst, start_pt=None, end_pt=None):
@@ -226,7 +199,7 @@ def find_holes(image):
 
                 lst += [((mx, my), mdiam)]
         else:
-            lst = [[] for cir in circles]
+            lst = [[] for _ in circles]
 
         return lst
 
@@ -260,7 +233,7 @@ def draw_table(img, circles):
     cv2.putText(img, '{} {:6s} {:6s} {:6s}'.format('ID', '  X', '  Y', 'diam'), h(-1), c_label_font, c_label_s, c_label_color)
 
     for i, cir in enumerate(circles):
-        ((x, y), diam), m_cir = cir
+        _, m_cir = cir
 
         label = chr(ord('A') + i)
 
@@ -303,7 +276,7 @@ def draw_path(img, circles, start_pt, end_pt, cur_pt):
     def mpt_to_pt_z(mpt):
         max_z = 10.
         max_sz = 50.
-        z = (mpt[2] - 0) / max_z * 50
+        z = (mpt[2] - 0) / max_z * max_sz
         print(mpt[2], max_z, z)
         return z
 
@@ -331,41 +304,18 @@ def draw_path(img, circles, start_pt, end_pt, cur_pt):
         cv2.circle(img, pt, sz, c, 3, lineType=cv2.LINE_AA)
 
 
-@static_vars(fps_lst=[], fps_t1=None)
-def draw_fps(image):
-    if draw_fps.fps_t1 is None:
-        draw_fps.fps_t1 = time.time()
-        return
-    t2 = time.time()
-    append_v(draw_fps.fps_lst, 1. / (t2 - draw_fps.fps_t1), 90)
-    draw_fps.fps_t1 = t2
-
-    fps = np.mean(draw_fps.fps_lst)
-
-    # cv2.putText(image, f'{fps:.2f} fps', (20, 30 * 2), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image, '{:.2f} fps'.format(fps), (20, image.shape[0] - 30), c_label_font, c_label_s, c_label_color)
-
-
-_error_str = ''
-
-
-def display_error(s):
-    global _error_str
-    _error_str = s
-
-
-@static_vars(ind=0)
+@common.static_vars(ind=0)
 def next_frame(video_capture):
     if not c_demo_mode:
         retval, image0 = video_capture.read()
     else:
-        for _ in range(2):
-            # fn = 'tests/z_camera/1280x720/mov_raw_{:06d}.ppm'.format(next_frame.ind)
-            # fn = 'tests/z_camera/1280x720/holes.png'
-            fn = 'tests/z_camera/1280x720/holes_and_slots.png'
-            if os.path.exists(fn):
-                break
-            next_frame.ind = 0
+        # for _ in range(2):
+        #     # fn = 'tests/z_camera/1280x720/mov_raw_{:06d}.ppm'.format(next_frame.ind)
+        #     if os.path.exists(fn):
+        #         break
+        #     next_frame.ind = 0
+        # fn = 'tests/z_camera/1280x720/holes.png'
+        fn = 'tests/z_camera/1280x720/holes_and_slots.png'
 
         retval, image0 = 1, cv2.imread(fn, -1)
         next_frame.ind += 1
@@ -374,10 +324,10 @@ def next_frame(video_capture):
 
     if not retval:
         print('rv is false')
-        raise InvalidImage()
+        raise common.InvalidImage
     if image0.size == 0:
         print('image0 is empty')
-        raise InvalidImage()
+        raise common.InvalidImage
 
     return image0
 
@@ -387,13 +337,7 @@ def draw_crosshairs(img, pt, off, c, thickness):
     cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=thickness, lineType=cv2.LINE_AA)
 
 
-def draw_selected_points(img, pts, c=(255, 64, 32), t=3):
-    # for i in range(len(pts)):
-    #     pt1, pt2 = pts[i], pts[(i + 1) % len(pts)]
-    #     cv2.line(img, pt1, pt2, c, thickness=t, lineType=cv2.LINE_AA)
-
-    c = (0, 0, 255)
-    t = 1
+def draw_selected_points(img, pts, c=(0, 0, 255), t=1):
     off = 10
 
     for pt in pts[:-1]:
@@ -408,12 +352,12 @@ def draw_selected_points(img, pts, c=(255, 64, 32), t=3):
             enlarged = cv2.resize(sub, (off2 * 4, off2 * 4))
             img[y - off2 * 2:y + off2 * 2, x - off2 * 2:x + off2 * 2, :] = enlarged
 
-        cv2.line(img, (pt[0] - off, pt[1]), (pt[0] + off, pt[1]), c, thickness=t, lineType=cv2.LINE_AA)
-        cv2.line(img, (pt[0], pt[1] - off), (pt[0], pt[1] + off), c, thickness=t, lineType=cv2.LINE_AA)
+        draw_crosshairs(img, pt, off, c, t)
 
 
-@static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(0, 0), end_mpt=(0, 0), cur_mpt=None, last_frame=None,
-             standalone=False)
+@common.static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(0, 0), end_mpt=(0, 0), cur_mpt=None,
+                    last_frame=None,
+                    standalone=False)
 def get_measurement(video_capture):
     if not get_measurement.pause_updates:
         image0 = next_frame(video_capture)
@@ -457,18 +401,7 @@ def get_measurement(video_capture):
     if not mouse_sqr_pts_done and get_measurement.mouse_op == 'alignment':
         draw_selected_points(final_img, mouse_sqr_pts)
 
-    if _error_str:
-        s = 'WARNING: ' + _error_str
-
-        c_label_font_error = cv2.FONT_HERSHEY_SIMPLEX
-        c_label_color_error = (0, 0, 255)
-        c_label_s_error = 1.5
-
-        thickness = 3
-        text_size, baseline = cv2.getTextSize(s, c_label_font_error, c_label_s_error, thickness)
-
-        text_pos = ((final_img.shape[1] - text_size[0]) // 2, (final_img.shape[0] + text_size[1]) // 2)
-        cv2.putText(final_img, s, text_pos, c_label_font_error, c_label_s_error, c_label_color_error, thickness)
+    common.draw_error(final_img)
 
     if get_measurement.record:
         fn1 = 'mov_raw_z_{:06}.ppm'.format(get_measurement.record_ind)
@@ -528,18 +461,18 @@ def get_measurement(video_capture):
                 in_alignment = True
 
         if get_measurement.c_view not in [1, 2]:
+            global mouse_pts, mouse_moving
             mouse_pts = []
             mouse_moving = False
 
     if in_alignment:
-        global ss
-        ss2 = 'Enter plate dimensions (W,H): ' + process_key.plate_size_str
-        cv2.putText(final_img, ss2, (20, 30), c_label_font, c_label_s, c_label_color)
+        ss = 'Enter plate dimensions (W,H): ' + process_key.plate_size_str
+        cv2.putText(final_img, ss, (20, 30), c_label_font, c_label_s, c_label_color)
     else:
         cv2.putText(final_img, 'Size (WxH): {:.3f} x {:.3f}'.format(*c_machine_rect[1]), (20, 30), c_label_font, c_label_s, c_label_color)
 
     if get_measurement.standalone:
-        draw_fps(final_img)
+        common.draw_fps(final_img)
 
     return circles, final_img
 
@@ -547,7 +480,7 @@ def get_measurement(video_capture):
 in_alignment = False
 
 
-@static_vars(plate_size_str='')
+@common.static_vars(plate_size_str='')
 def process_key(key):
     global in_alignment, c_machine_rect
     global mouse_sqr_pts, mouse_sqr_pts_done
@@ -578,7 +511,7 @@ def process_key(key):
         elif key == 8:  # backspace
             process_key.plate_size_str = process_key.plate_size_str[:-1]
         elif key in [27, ord('q')]:  # Escape or q
-            raise QuitException
+            raise common.QuitException
         elif key == 255:
             pass
         else:
@@ -610,7 +543,7 @@ def process_key(key):
     elif key == ord('3'):
         get_measurement.c_view = 3
     elif key in [27, ord('q')]:  # Escape or q
-        raise QuitException
+        raise common.QuitException
     elif key != 255:
         print(key)
         return False
@@ -696,8 +629,8 @@ def main():
             if key == ord('l'):
                 for c in circles:
                     print(c)
-                print
-        except QuitException:
+                print()
+        except common.QuitException:
             break
 
 
