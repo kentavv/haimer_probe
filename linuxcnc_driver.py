@@ -763,7 +763,7 @@ def click_and_crop(event, x0, y0, flags, param):
     z_camera.click_and_crop(event, x, y, flags, param)
 
 
-_error_str = None
+_error_str = ''
 
 
 def display_error(s):

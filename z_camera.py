@@ -346,7 +346,7 @@ def draw_fps(image):
     cv2.putText(image, '{:.2f} fps'.format(fps), (20, image.shape[0] - 30), c_label_font, c_label_s, c_label_color)
 
 
-_error_str = None
+_error_str = ''
 
 
 def display_error(s):
