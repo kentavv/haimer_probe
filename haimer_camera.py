@@ -421,6 +421,8 @@ def next_frame2(video_capture):
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
 
+    build_all = get_measurement.record or get_measurement.save or get_measurement.debug_view
+
     image0 = next_frame2(video_capture)
     h, w = image0.shape[:2]
     image_center = c_image_center(w, h)
@@ -449,25 +451,26 @@ def get_measurement(video_capture):
 
         mm_final, mm_b, mm_r = calc_mm(theta_b, theta_r)
 
-    # Draw outer circle dial and crosshairs on dial pivot.
-    cv2.circle(image1, image_center, c_dial_outer_mask_r, c_line_color, c_line_s)
-    cv2.line(image1,
-             (image_center[0] - c_inner_mask_r, image_center[1] - c_inner_mask_r),
-             (image_center[0] + c_inner_mask_r, image_center[1] + c_inner_mask_r),
-             c_line_color, 1)
-    cv2.line(image1,
-             (image_center[0] - c_inner_mask_r, image_center[1] + c_inner_mask_r),
-             (image_center[0] + c_inner_mask_r, image_center[1] - c_inner_mask_r),
-             c_line_color, 1)
+    if build_all:
+        # Draw outer circle dial and crosshairs on dial pivot.
+        cv2.circle(image1, image_center, c_dial_outer_mask_r, c_line_color, c_line_s)
+        cv2.line(image1,
+                 (image_center[0] - c_inner_mask_r, image_center[1] - c_inner_mask_r),
+                 (image_center[0] + c_inner_mask_r, image_center[1] + c_inner_mask_r),
+                 c_line_color, 1)
+        cv2.line(image1,
+                 (image_center[0] - c_inner_mask_r, image_center[1] + c_inner_mask_r),
+                 (image_center[0] + c_inner_mask_r, image_center[1] - c_inner_mask_r),
+                 c_line_color, 1)
 
-    # Draw black arrow mask
-    cv2.circle(image1, image_center, c_black_outer_mask_r, c_line_color, c_line_s)
-    cv2.ellipse(image1, image_center, c_black_outer_mask_e, 0, 0, 360, c_line_color, c_line_s)
-    cv2.circle(image1, image_center, c_inner_mask_r, c_line_color, c_line_s)
+        # Draw black arrow mask
+        cv2.circle(image1, image_center, c_black_outer_mask_r, c_line_color, c_line_s)
+        cv2.ellipse(image1, image_center, c_black_outer_mask_e, 0, 0, 360, c_line_color, c_line_s)
+        cv2.circle(image1, image_center, c_inner_mask_r, c_line_color, c_line_s)
 
-    # Draw red arrow mask
-    cv2.circle(image1, image_center, c_red_outer_mask_r, c_line_color, c_line_s)
-    cv2.circle(image1, image_center, c_inner_mask_r, c_line_color, c_line_s)
+        # Draw red arrow mask
+        cv2.circle(image1, image_center, c_red_outer_mask_r, c_line_color, c_line_s)
+        cv2.circle(image1, image_center, c_inner_mask_r, c_line_color, c_line_s)
 
     # Draw final marked up image
     mask = np.zeros(image2.shape, dtype=image2.dtype)
@@ -481,21 +484,24 @@ def get_measurement(video_capture):
 
         draw_labels(image2, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final)
 
-    # Build and display composite image
-    img_all0 = np.vstack([image0, image1, image2])
-    img_all1 = np.vstack([seg_b, skel_b, image_b])
-    img_all2 = np.vstack([seg_r, skel_r, image_r])
-    img_all = np.hstack([img_all0, img_all1, img_all2])
+    if build_all:
+        # Build and display composite image
+        img_all0 = np.vstack([image0, image1, image2])
+        img_all1 = np.vstack([seg_b, skel_b, image_b])
+        img_all2 = np.vstack([seg_r, skel_r, image_r])
+        img_all = np.hstack([img_all0, img_all1, img_all2])
 
     img_b = cv2.resize(image_b, None, fx=0.5, fy=0.5)
     img_r = cv2.resize(image_r, (image2.shape[1] - img_b.shape[1], image2.shape[0] - img_b.shape[0]))
     img_simple = np.vstack([image2, np.hstack([img_b, img_r])])
 
     if get_measurement.standalone:
-        common.draw_fps(img_all)
-        common.draw_fps(img_simple, append_t=False)
+        common.draw_fps(img_simple)
+        if build_all:
+            common.draw_fps(img_all, append_t=False)
 
-    img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
+    if build_all:
+        img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
 
     if get_measurement.debug_view:
         final_img = img_all_resized

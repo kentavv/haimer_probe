@@ -340,24 +340,31 @@ def draw_selected_points(img, pts, c=(0, 0, 255), t=1):
 
 
 @common.static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(0, 0), end_mpt=(0, 0), cur_mpt=None,
-                    last_frame=None,
-                    standalone=False)
+                    last_image0=None, last_image1=None, last_circles=[],  standalone=False)
 def get_measurement(video_capture):
     if not get_measurement.pause_updates:
         image0 = next_frame2(video_capture)
-        get_measurement.last_frame = image0
+        get_measurement.last_image0 = image0
     else:
-        image0 = get_measurement.last_frame
+        image0 = get_measurement.last_image0
 
-    if get_measurement.warp_m is not None:
-        h, w = image0.shape[:2]
-        warped = cv2.warpPerspective(image0, get_measurement.warp_m, (w, h))
-        image1 = warped
+    if not get_measurement.pause_updates:
+        if get_measurement.warp_m is not None:
+            h, w = image0.shape[:2]
+            warped = cv2.warpPerspective(image0, get_measurement.warp_m, (w, h))
+            image1 = warped
+        else:
+            image1 = image0.copy()
+        get_measurement.last_image1 = image1
     else:
-        image1 = image0.copy()
+        image1 = get_measurement.last_image1
 
-    circles = find_holes(image1)
-    circles = organize_circles(circles, get_measurement.start_mpt, get_measurement.end_mpt)
+    if not get_measurement.pause_updates:
+        circles = find_holes(image1)
+        circles = organize_circles(circles, get_measurement.start_mpt, get_measurement.end_mpt)
+        get_measurement.last_circles = circles
+    else:
+        circles = get_measurement.last_circles
 
     image_b = image1.copy()
     draw_table(image_b, circles)
