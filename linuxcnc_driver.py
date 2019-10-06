@@ -851,9 +851,9 @@ def update_view(video_capture, video_capture2):
     else:
         accepted = False
 
-    if not accepted or key in [ord('r'), ord('s')]:
+    if not accepted:
         accepted = haimer_camera.process_key(key)
-    if not accepted or key in [ord('r'), ord('s')]:
+    if not accepted:
         z_camera.process_key(key)
 
     return mm_final, circles
