@@ -55,6 +55,7 @@ import common
 import haimer_camera
 import z_camera
 
+c_camera_name = 'KvvCreates'
 c_demo_mode = True
 
 if c_demo_mode:
@@ -744,9 +745,6 @@ def click_and_crop(event, x0, y0, flags, param):
     y = int(round(y0 / c_final_image_scale_factor))
 
     z_camera.click_and_crop(event, x, y, flags, param)
-
-
-c_camera_name = 'linuxcnc_driver'
 
 
 @common.static_vars(save=False, record=False, record_ind=0, do_touchoff=False)
