@@ -38,6 +38,8 @@
 #    exposure helps as the light intensity changes, but will help with glare
 #    and may be hindered by glare.
 
+from __future__ import print_function
+
 import math
 import os
 import sys
@@ -579,10 +581,7 @@ def get_measurement(video_capture):
                 print('Wrote images {} {} {}'.format(fn1, fn2, fn3))
                 break
 
-    if not get_measurement.pause_updates:
-        cv2.imshow(c_camera_name, final_img)
-
-    return mm_final
+    return mm_final, final_img
 
 
 def process_key(key):
@@ -594,7 +593,7 @@ def process_key(key):
         get_measurement.save = True
     elif key == ord('d'):
         get_measurement.debug_view = not get_measurement.debug_view
-    elif key == ord('t'):
+    elif key == ord('z'):
         if calc_mm.tare_on:
             calc_mm.tare_lst = []
             calc_mm.tare_on = False
@@ -611,7 +610,7 @@ def process_key(key):
         elif key == 84:  # KEY_DOWN
             c_center_offset[1] += 1
         print('c_center_offset:', c_center_offset)
-    elif key == ord('q'):
+    elif key in [27, ord('q')]: # Escape or q
         raise QuitException
     elif key >= 0:
         # print(key)
@@ -621,7 +620,7 @@ def process_key(key):
 
 
 def gauge_vision_setup():
-    video_capture = cv2.VideoCapture(0)
+    video_capture = cv2.VideoCapture(1)
     if not video_capture.isOpened():
         print('camera is not open')
         sys.exit(1)
@@ -639,7 +638,9 @@ def main():
 
     while True:
         try:
-            mm_final = get_measurement(video_capture)
+            mm_final, final_img = get_measurement(video_capture)
+            if not get_measurement.pause_updates:
+                cv2.imshow(c_camera_name, final_img)
             key = cv2.waitKey(5) & 0xff
             process_key(key)
             # print('mm_final:', mm_final)
