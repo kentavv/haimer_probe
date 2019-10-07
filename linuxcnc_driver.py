@@ -168,6 +168,27 @@ def is_moving(s):
     return any([abs(s.axis[x]['velocity']) > 0. for x in range(3)])
 
 
+def wait_for_ready(s, max_dt=5.):
+    max_dt = 5.
+    st = time.time()
+    while True:
+        s.poll()
+        print(s.axis[0]['input'], s.axis[0]['output'], s.axis[0]['homed'], s.axis[0]['velocity'], s.axis[0]['enabled'])
+        moving = is_moving(s)
+        ok = ok_for_mdi(s)
+        ready = not moving and ok
+        dt = time.time() - st
+        if ready:
+            print('Ready after {} s'.format(dt))
+            break
+        elif dt > max_dt:
+            print('Giving up being read after {} s'.format(dt))
+            break
+        time.sleep(.1)
+
+    return ready
+
+
 def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z, max_mm=1.0, local=False, feedrate=None):
     if feedrate is None:
         feedrate = c_feedrate
@@ -207,7 +228,8 @@ def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z, max_mm=1.0, local=Fals
             raise OvershootException(mm_final)
 
         if not ok_for_mdi(s) and not moving:
-            raise NotReady()
+            if not wait_for_ready(s):
+                raise NotReady()
         elif ok_for_mdi(s) and not moving:
             print('state', state, 'mm_final:', mm_final)
 
@@ -285,7 +307,8 @@ def find_edge(video_capture, direction):
         div_f = 2
 
         if not ok_for_mdi(s) and not moving:
-            raise NotReady()
+            if not wait_for_ready(s):
+                raise NotReady()
         elif ok_for_mdi(s) and not moving:
             # print('state', state, 'total_e:', total_e, 'in_final:', in_final, 'mm_final:', mm_final)
             print('state', state, 'in_final:', in_final, 'mm_final:', mm_final)
@@ -848,7 +871,7 @@ def update_view(video_capture, video_capture2):
 
         rows = [header]
         for res in results:
-            rows += [[rows[0]] + ['{:.4f}'.format(x) for x in res[1:]]]
+            rows += [[res[0]] + ['{:.4f}'.format(x) for x in res[1:]]]
 
         fn = 'circles.csv'
         with open(fn, 'wb') as f:
