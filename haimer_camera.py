@@ -514,7 +514,7 @@ def get_measurement(video_capture):
     else:
         final_img = img_simple
 
-    if not get_measurement.standalone:
+    if get_measurement.standalone:
         common.draw_error(final_img)
 
         if get_measurement.record:
