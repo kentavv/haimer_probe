@@ -23,6 +23,7 @@
 
 import sys
 
+# noinspection PyUnresolvedReferences
 import cv2
 
 

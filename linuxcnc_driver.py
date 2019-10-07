@@ -352,7 +352,7 @@ def find_edge(video_capture, direction):
                     # In case the oscillations do not stop, exit the loop. The error will be tiny.
                     print('Aborting due to excessive oscillation, current total_e = {} > {}'.format(total_e, tolerance_e))
                     state = 4
-                    continue 
+                    continue
                 elif in_state_3 > 5:
                     # Could alternatively increase the finishing error tolerance
                     # Best would be to back away from and reapproach the edge
