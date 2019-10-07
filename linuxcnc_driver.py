@@ -250,6 +250,8 @@ def find_edge(video_capture, direction):
     start_y = None
     start_z = None
 
+    tolerance_e = .0005
+
     while True:
         s = linuxcnc.stat()
         s.poll()
@@ -315,7 +317,7 @@ def find_edge(video_capture, direction):
                         total_e = abs(xe) + abs(ye) + abs(ze)
                         if dwell_time == c_fast_dwell:
                             state = 1
-                        elif total_e > .0005:
+                        elif total_e > tolerance_e:
                             print('total_e', total_e)
                             state = 3
                         else:
@@ -323,10 +325,17 @@ def find_edge(video_capture, direction):
                 continue
             elif state == 3:
                 in_state_3 += 1
-                if in_state_3 > 5:
-                    print('Oscillation may be occuring. Reducing div_f')
+                if in_state_3 > 10:
+                    # In case the oscillations do not stop, exit the loop. The error will be tiny.
+                    print('Aborting due to excessive oscillation, current total_e = {} > {}'.format(total_e, tolerance_e))
+                    state = 4
+                    continue 
+                elif in_state_3 > 5:
                     # Could alternatively increase the finishing error tolerance
+                    # Best would be to back away from and reapproach the edge
+                    print('Oscillation may be occuring, current total_e = {} > {}, reducing div_f'.format(total_e, tolerance_e))
                     div_f = 4
+
                 if abs(mm_final) > .05:
                     cmd_x = x - xe * .95
                     cmd_y = y - ye * .95
