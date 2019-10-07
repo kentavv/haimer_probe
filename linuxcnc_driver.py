@@ -773,7 +773,7 @@ def update_view(video_capture, video_capture2):
             }
 
     lst = machine_to_part_cs()
-    if not z_camera.get_measurement.pause_updates:
+    if not z_camera.get_measurement.lock_path:
         z_camera.get_measurement.start_mpt = lst
     z_camera.get_measurement.cur_mpt = lst
 

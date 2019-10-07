@@ -344,7 +344,7 @@ def draw_selected_points(img, pts, c=(0, 0, 255), t=1):
 
 
 @common.static_vars(pause_updates=False, save=False, record=False, record_ind=0, mouse_op='', c_view=3, warp_m=None, start_mpt=(0, 0), end_mpt=(0, 0), cur_mpt=None,
-                    last_image0=None, last_image1=None, last_circles=[], standalone=False)
+                    last_image0=None, last_image1=None, last_image_b=None, last_circles=[], standalone=False, lock_path=False)
 def get_measurement(video_capture):
     if not get_measurement.standalone:
         get_measurement.record = False
@@ -363,21 +363,23 @@ def get_measurement(video_capture):
             image1 = warped
         else:
             image1 = image0.copy()
-        get_measurement.last_image1 = image1
+        get_measurement.last_image1 = image1.copy()
     else:
-        image1 = get_measurement.last_image1
+        image1 = get_measurement.last_image1.copy()
 
-    if not get_measurement.pause_updates:
+    if not get_measurement.lock_path:
         circles = find_holes(image1)
         circles = organize_circles(circles, get_measurement.start_mpt, get_measurement.end_mpt)
         get_measurement.last_circles = circles
+        image_b = image1.copy()
+        get_measurement.last_image_b = image_b.copy()
     else:
         circles = get_measurement.last_circles
+        image_b = get_measurement.last_image_b.copy()
 
-    image_b = image1.copy()
     draw_table(image_b, circles)
     draw_circles(image_b, circles)
-    draw_path(image_b, circles, get_measurement.start_mpt, get_measurement.end_mpt, get_measurement.cur_mpt, get_measurement.pause_updates)
+    draw_path(image_b, circles, get_measurement.start_mpt, get_measurement.end_mpt, get_measurement.cur_mpt, get_measurement.lock_path)
 
     global in_alignment
 
@@ -507,6 +509,7 @@ def process_key(key):
                 if len(process_key.plate_size) == 2:
                     c_machine_rect[1] = process_key.plate_size
                     print(c_machine_rect)
+                    get_measurement.pause_updates = True
 
             process_key.plate_size_str = ''
         elif key == 8:  # backspace
@@ -520,10 +523,12 @@ def process_key(key):
 
         return True
 
-    if key == ord('p'):
+    if key == ord('f'):
         get_measurement.pause_updates = not get_measurement.pause_updates
     elif key == ord('l'):
-        get_measurement.pause_updates = not get_measurement.pause_updates
+        get_measurement.lock_path = not get_measurement.lock_path
+        if get_measurement.lock_path:
+            get_measurement.pause_updates = True
     elif key == ord('r'):
         get_measurement.record = not get_measurement.record
     elif key == ord('s'):
