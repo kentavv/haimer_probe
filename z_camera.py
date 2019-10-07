@@ -536,6 +536,8 @@ def process_key(key):
     elif key == ord('a'):  # and not get_measurement.pause_updates:
         get_measurement.mouse_op = 'alignment'
         get_measurement.c_view = 1
+        get_measurement.pause_updates = False
+        get_measurement.lock_path = False
         mouse_sqr_pts = []
         mouse_sqr_pts_done = False
     # elif key == ord('f'):
