@@ -84,7 +84,7 @@ def main():
             c_label_font = cv2.FONT_HERSHEY_SIMPLEX
             c_label_color = (0, 0, 0)
             c_label_s = .4 * scale
-            thickness = 1
+            thickness = 2
             s = str(i)
             text_size, baseline = cv2.getTextSize(s, c_label_font, c_label_s, thickness)
             cv2.putText(img, s, (pts[i][0] - text_size[0] // 2, pts[i][1] + text_size[1] // 2), c_label_font, c_label_s, c_label_color, thickness)
