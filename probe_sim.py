@@ -60,7 +60,7 @@ def main():
 
     scale = 2
     r0 = 10 * scale  # Radius of the probe tip
-    pts = [(frame_center[0], frame_center[1] + 100 * scale)] * 5  # this the point where the probe lowers
+    pts = [(frame_center[0], frame_center[1])] * 5  # this the point where the probe lowers
 
     c_unknown_color = (0, 0, 128)
     c_safe_color = (0, 160, 0)
@@ -92,6 +92,7 @@ def main():
     img = np.zeros(frame_dim, dtype=np.uint8)
     img[:] = c_unknown_color
     draw_points()
+    update_screen(img, 5)
 
     for move in ['right', 'left', 'down', 'up']:
         u = 0
