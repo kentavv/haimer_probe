@@ -26,157 +26,101 @@ import math
 import cv2
 import numpy as np
 
+
+def euc_dist(a, b):
+    return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
+
+
 def main():
     frame_dim = (1080, 1920, 3)
     r0 = 10
-    cpt = (1920//2, 1080//2) # this the point where the probe lowers
-    pt0 = (cpt[0], cpt[1]+100)
+    frame_center = (1920 // 2, 1080 // 2)
+
+    pt0 = (frame_center[0], frame_center[1] + 100)  # this the point where the probe lowers
+    pt1 = pt2 = pt3 = pt4 = pt0
 
     c_unknown_color = (0, 0, 127)
     c_safe_color = (0, 200, 0)
     c_pt_color = (0, 255, 0)
-    c_unassigned_color = (0, 0, 63)
+    c_unassigned_color = (0, 0, 95)
 
-    #line_type = cv2.LINE_AA
-    line_type = 0 
-    scan_range = [-1000, 1000]
+    # line_type = cv2.LINE_AA
+    line_type = 0
+    scan_range = [-3000, 3000]
 
-    if True:
-     # First move to the right
-     for ii in range(0, 100, 10):
-        img = np.zeros(frame_dim, dtype=np.uint8)
-        img[:] = c_safe_color
+    step_size = 10
 
-        pt1 = pt2 = pt0
-        pt2 = (pt0[0] + ii, pt0[1])
-        cv2.circle(img, pt1, r0, c_pt_color, -1, lineType=line_type)
-        cv2.circle(img, pt2, r0, c_pt_color, -1, lineType=line_type)
- 
-        md_pt = (pt1[0]+(pt2[0]-pt1[0])/2, pt1[1])
-        for i in range(*scan_range):
-           tpt = (md_pt[0], md_pt[1] + i)
- 
-           r2 = math.sqrt((pt1[0] - tpt[0])**2 + (pt1[1] - tpt[1])**2)
-           cv2.circle(img, tpt, int(round(r2+r0)), c_unknown_color, 2, lineType=line_type)
+    for move in ['right', 'left', 'down', 'up']:
+        u = 0
+        if move == 'right':
+            u = 100
+        elif move == 'left':
+            u = 100
+        elif move == 'down':
+            pt3 = (md_pt[0], md_pt[1])
+            u = 50
+        elif move == 'up':
+            pt4 = (md_pt[0], md_pt[1])
+            u = 600
 
-           #cv2.imshow('test', img)
-           #cv2.waitKey(5)
+        for ii in range(0, u, step_size):
+            img = np.zeros(frame_dim, dtype=np.uint8)
+            img[:] = c_safe_color
 
-        cv2.floodFill(img, None, (0, 1080//2), c_unassigned_color)
-        cv2.floodFill(img, None, (1920-1, 1080//2), c_unassigned_color)
+            md_pt = (pt2[0] + (pt1[0] - pt2[0]) / 2, pt2[1])
+            mi, mr = -1, float('inf')
+            cb = False
 
-        cv2.imshow('test', img)
-        cv2.waitKey(5) 
+            if move == 'right':
+                pt1 = (pt1[0] + step_size, pt1[1])
+            elif move == 'left':
+                pt2 = (pt2[0] - step_size, pt1[1])
+            elif move == 'down':
+                pt3 = (pt3[0], pt3[1] + step_size)
+            elif move == 'up':
+                pt4 = (pt4[0], pt4[1] - step_size)
 
-    if True:
-     # Next move to the left
-     for ii in range(0, 100, 10):
-        img = np.zeros(frame_dim, dtype=np.uint8)
-        img[:] = c_safe_color
+            for pt in [pt1, pt2, pt3, pt4]:
+                cv2.circle(img, pt, r0, c_pt_color, -1, lineType=line_type)
 
-        pt1 = pt0
-        pt1 = (pt0[0] - ii, pt0[1])
-        cv2.circle(img, pt1, r0, c_pt_color, -1, lineType=line_type)
-        cv2.circle(img, pt2, r0, c_pt_color, -1, lineType=line_type)
+            for i in range(*scan_range):
+                tpt = (md_pt[0], md_pt[1] + i)
 
-        md_pt = (pt1[0]+(pt2[0]-pt1[0])/2, pt1[1])
-        for i in range(*scan_range):
-           tpt = (md_pt[0], md_pt[1] + i)
+                r2 = euc_dist(pt2, tpt)
+                if move in ['right', 'left']:
+                    cv2.circle(img, tpt, int(round(r2 + r0)), c_unknown_color, 2, lineType=line_type)
+                elif move == 'down':
+                    r3 = euc_dist(pt3, tpt)
+                    if abs(r2 - r3) < 2.:
+                        print(ii, r2, r3)
+                        cv2.circle(img, tpt, int(round(r2 + r0)), c_unknown_color, 2, lineType=line_type)
+                elif move == 'up':
+                    cv2.circle(img, pt4, r0, c_pt_color, -1, lineType=line_type)
 
-           r2 = math.sqrt((pt1[0] - tpt[0])**2 + (pt1[1] - tpt[1])**2)
-           cv2.circle(img, tpt, int(round(r2+r0)), c_unknown_color, 2, lineType=line_type)
+                    r3 = euc_dist(pt3, tpt)
+                    r4 = euc_dist(pt4, tpt)
+                    # if abs(r2 - r3) < 2 and abs(r2 - r4) < 2.:
+                    if abs(r2 - r3) < 0.1:  # and abs(r2 - r4) < 2.:
+                        if mr > abs(r2 - r4):
+                            mr = abs(r2 - r4)
+                            mi = i
+                        print(ii, r2, r3, r4)
+                        cv2.circle(img, tpt, int(round(r2 + r0)), c_unknown_color, 2, lineType=line_type)
+                        cb = cb or r2 - (r4 + r0) < 0.
 
-           #cv2.imshow('test', img)
-           #cv2.waitKey(5)
+                # cv2.imshow('test', img)
+                # cv2.waitKey(5)
 
-        cv2.floodFill(img, None, (0, 1080//2), c_unassigned_color)
-        cv2.floodFill(img, None, (1920-1, 1080//2), c_unassigned_color)
+            cv2.floodFill(img, None, (0, 1080 // 2), c_unassigned_color)
+            cv2.floodFill(img, None, (1920 - 1, 1080 // 2), c_unassigned_color)
 
-        cv2.imshow('test', img)
-        cv2.waitKey(5)
+            cv2.imshow('test', img)
+            cv2.waitKey(5)
 
-    #pt1 = (pt0[0]-200, pt0[1]+200)
-   # pt2 = (pt0[0]+200, pt0[1]+200)
-
-    if True:
-     # Next move down
-     for ii in range(0, 50, 10):
-        img = np.zeros(frame_dim, dtype=np.uint8)
-        img[:] = c_safe_color
-
-        md_pt = (pt1[0]+(pt2[0]-pt1[0])/2, pt1[1])
-        pt3 = (md_pt[0], md_pt[1]+ii)
-
-        cv2.circle(img, pt1, r0, c_pt_color, -1, lineType=line_type)
-        cv2.circle(img, pt2, r0, c_pt_color, -1, lineType=line_type)
-
-        for i in range(*scan_range):
-           tpt = (md_pt[0], md_pt[1] + i)
-
-           cv2.circle(img, pt3, r0, c_pt_color, -1, lineType=line_type)
-
-           r2 = math.sqrt((pt1[0] - tpt[0])**2 + (pt1[1] - tpt[1])**2)
-           r3 = math.sqrt((pt3[0] - tpt[0])**2 + (pt3[1] - tpt[1])**2)
-           if abs(r2 - r3) < 2:
-             print(ii, r2, r3)
-             cv2.circle(img, tpt, int(round(r2+r0)), c_unknown_color, 2, lineType=line_type)
-
-           #cv2.imshow('test', img)
-           #cv2.waitKey(5)
-
-        cv2.floodFill(img, None, (0, 1080//2), c_unassigned_color)
-        cv2.floodFill(img, None, (1920-1, 1080//2), c_unassigned_color)
-
-        cv2.imshow('test', img)
-        cv2.waitKey(5)
-
-    #md_pt = (pt1[0]+(pt2[0]-pt1[0])/2, pt1[1])
-    #pt3 = (md_pt[0], md_pt[1]+100)
-
-    if True:
-      # Finally, move up
-     for ii in range(0, 600, 10):
-        img = np.zeros(frame_dim, dtype=np.uint8)
-        img[:] = c_safe_color
-
-        md_pt = (pt1[0]+(pt2[0]-pt1[0])/2, pt1[1])
-        pt4 = (md_pt[0], md_pt[1]-ii)
-
-        cv2.circle(img, pt1, r0, c_pt_color, -1, lineType=line_type)
-        cv2.circle(img, pt2, r0, c_pt_color, -1, lineType=line_type)
-        cv2.circle(img, pt3, r0, c_pt_color, -1, lineType=line_type)
-
-        mi, mr = -1, 100000
-        cb = False
-        for i in range(*scan_range):
-           tpt = (md_pt[0], md_pt[1] + i)
-
-           cv2.circle(img, pt4, r0, c_pt_color, -1, lineType=line_type)
-
-           r2 = math.sqrt((pt1[0] - tpt[0])**2 + (pt1[1] - tpt[1])**2)
-           r3 = math.sqrt((pt3[0] - tpt[0])**2 + (pt3[1] - tpt[1])**2)
-           r4 = math.sqrt((pt4[0] - tpt[0])**2 + (pt4[1] - tpt[1])**2)
-           # if abs(r2 - r3) < 2 and abs(r2 - r4) < 2:
-           if abs(r2 - r3) < 0.1: # and abs(r2 - r4) < 2:
-             if mr > abs(r2 - r4):
-               mr = abs(r2 - r4)
-               mi = i
-             print(ii, r2, r3, r4)
-             cv2.circle(img, tpt, int(round(r2+r0)), c_unknown_color, 2, lineType=line_type)
-             cb = cb or r2 - (r4 + r0) < 0
-
-           #cv2.imshow('test', img)
-           #cv2.waitKey(5)
-
-        cv2.floodFill(img, None, (0, 1080//2), c_unassigned_color)
-        cv2.floodFill(img, None, (1920-1, 1080//2), c_unassigned_color)
-
-        print(ii, mi, mr)
-        if cb:
-           break
-
-        cv2.imshow('test', img)
-        cv2.waitKey(5)
+            if move == 'up':
+                print(ii, mi, mr)
+                if cb:
+                    break
 
     cv2.imshow('test', img)
     cv2.waitKey(0)
@@ -184,4 +128,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
