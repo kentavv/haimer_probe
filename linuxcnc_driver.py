@@ -169,6 +169,8 @@ def is_moving(s):
 
 
 def wait_for_ready(s, max_dt=5.):
+    # TODO During long moves, max_dt might be exceeded. The logic should be improved here and other places
+    #  to handle longer running moves safely
     max_dt = 5.
     st = time.time()
     while True:
@@ -230,7 +232,7 @@ def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z, max_mm=1.0, local=Fals
         if not ok_for_mdi(s) and not moving:
             if not wait_for_ready(s):
                 raise NotReady()
-        elif ok_for_mdi(s) and not moving:
+        elif ok_for_mdi(s) and not moving and state != 2:
             print('state', state, 'mm_final:', mm_final)
 
             if state == 0:
@@ -241,7 +243,14 @@ def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z, max_mm=1.0, local=Fals
                 continue
             elif state == 1:
                 move_to(cmd_x, cmd_y, cmd_z, feedrate=feedrate)
-            elif state == 2:
+                # TODO: Reconsider this logic
+                #  State == 2 was added because if the commanded position is achieved before 'ok_for_mdi(s) and not moving'
+                # is considered again, there can be a loop created in state == 1. To get to step 3, the original step 2,
+                # there must be a period where the machine is seen to be moving. The most extreme is when start = cmd, but
+                # it's not the only case, because some time is needed for the video to update and the move could have
+                # completed by the next time through.
+                state = 2
+            elif state == 3:
                 dx = x - cmd_x
                 dy = y - cmd_y
                 dz = z - cmd_z
@@ -251,9 +260,10 @@ def monitored_move_to(video_capture, cmd_x, cmd_y, cmd_z, max_mm=1.0, local=Fals
         else:
             print('Waiting for move to complete.')
 
-            if state == 1:
+            if state == 2:
                 print('mm_final', mm_final)
-                state = 2
+            if ok_for_mdi(s) and not moving:
+                state = 3
 
         sys.stdout.flush()
 
