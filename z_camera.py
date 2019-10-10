@@ -469,7 +469,10 @@ def get_measurement(video_capture):
             mouse_moving = False
 
     if in_alignment:
-        ss = 'Enter plate dimensions (W,H): ' + process_key.plate_size_str
+        ss2 = ''
+        if c_machine_rect[1]:
+            ss2 = ' [{:.3f} x {:.3f}]'.format(*c_machine_rect[1])
+        ss = 'Enter plate dimensions (W,H){}: {}'.format(ss2, process_key.plate_size_str)
         cv2.putText(final_img, ss, (20, 30), c_label_font, c_label_s, c_label_color)
     elif c_machine_rect[1]:
         cv2.putText(final_img, 'Size (WxH): {:.3f} x {:.3f}'.format(*c_machine_rect[1]), (20, 30), c_label_font, c_label_s, c_label_color)
@@ -504,13 +507,14 @@ def process_key(key):
             try:
                 process_key.plate_size = [float(x) for x in process_key.plate_size_str.split(',')]
             except ValueError:
-                pass
+                global c_crop_rect 
+                c_crop_rect = None 
+                get_measurement.warp_m = None
             else:
                 if len(process_key.plate_size) == 2:
                     c_machine_rect[1] = process_key.plate_size
                     print(c_machine_rect)
                     get_measurement.pause_updates = True
-
             process_key.plate_size_str = ''
         elif key == 8:  # backspace
             process_key.plate_size_str = process_key.plate_size_str[:-1]
