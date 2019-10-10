@@ -162,6 +162,7 @@ def main():
                     pts[5] = tpt
 
                 r1 = euc_dist(pts[1], tpt)
+                r1b = euc_dist(pts[1], md_pt)
                 r4 = euc_dist(pts[4], tpt)
 
                 # top_pt_found = r1 - (r4 + r0) < 0.
@@ -171,7 +172,10 @@ def main():
                     if abs(err) > 0.:
                         print('Final overshoot:', err)
 
-                cv2.circle(img, tpt, int(round(r1 + r0)), c_unknown_color, 2, lineType=line_type)
+                if move == 'down' and r1b > mr:
+                    cv2.circle(img, md_pt, int(round(r1b + r0)), c_unknown_color, 2, lineType=line_type)
+                else:
+                    cv2.circle(img, tpt, int(round(r1 + r0)), c_unknown_color, 2, lineType=line_type)
 
             c = c_unassigned_color if move in ['right', 'left'] else c_unknown_color
             cv2.floodFill(img, None, (0, pts[0][1]), c)
