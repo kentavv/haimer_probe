@@ -43,6 +43,8 @@ record = True
 def update_screen(img, delay=0):
     global inc, record
     if record:
+        # Can convert to PNGs later with
+        # find . -iname '*.ppm' -print0 | xargs -0 -n 1 -P 16 optipng -o9
         fn = 'mov_{0:06d}.ppm'.format(inc)
         inc += 1
         cv2.imwrite(fn, img)
@@ -60,7 +62,7 @@ def main():
 
     scale = 2
     r0 = 10 * scale  # Radius of the probe tip
-    pts = [(frame_center[0], frame_center[1])] * 5  # this the point where the probe lowers
+    pts = [(frame_center[0], frame_center[1])] * 6  # this the point where the probe lowers
 
     c_unknown_color = (0, 0, 128)
     c_safe_color = (0, 160, 0)
@@ -120,7 +122,7 @@ def main():
 
             md_pt = (pts[2][0] + (pts[1][0] - pts[2][0]) / 2, pts[2][1])
             if move in ['right', 'left']:
-                pts[3] = pts[4] = md_pt
+                pts[3] = pts[4] = pts[5] = md_pt
 
             # There's some error that causes some of the drawn outer points to be drawn over, especially points 1 and 2
             # while searching left and right. This is likely because the later circles use integer dimensions. Adding a
@@ -155,6 +157,9 @@ def main():
             top_pt_found = False
             if move in ['down', 'up']:
                 tpt = (md_pt[0], md_pt[1] + mi)
+
+                if move == 'down':
+                    pts[5] = tpt
 
                 r1 = euc_dist(pts[1], tpt)
                 r4 = euc_dist(pts[4], tpt)
