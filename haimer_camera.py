@@ -38,21 +38,29 @@
 #    exposure helps as the light intensity changes, but will help with glare
 #    and may be hindered by glare.
 
-import math
+from __future__ import print_function
+
 import os
 import sys
-import time
 
 import cv2
+import math
 import numpy as np
+
+import camera
+import common
+from common import next_frame
+
+c_camera_name = 'HaimerCamera'
+c_demo_mode = False
 
 c_haimer_ball_diam = 4.  # millimeters
 
 c_dial_outer_mask_r = 220
 
-c_red_angle_start = 1.9183842044515955
-c_red_angle_end = -1.8894180264975993 + 2 * math.pi
-c_initial_image_rot = -.07275208078176175254 + 0.002881063774711395
+c_red_angle_start = 1.9170124625343092
+c_red_angle_end = c_red_angle_start + 2.5120631002707458  # = -1.8894180264975993 + 2 * math.pi - c_red_angle_start
+c_initial_image_rot = -.07513945576152618354
 
 c_rho_resolution = 1 / 2.  # 1/2 pixel
 c_theta_resolution = np.pi / 180 / 4.  # 1/4 degree
@@ -80,31 +88,8 @@ c_label_s = .8
 c_line_color = (0, 200, 0)
 c_line_s = 2
 
-c_center_offset = [12, 3]
+c_center_offset = [18, -6]
 c_image_center = lambda w, h: (w // 2 + c_center_offset[0], h // 2 + c_center_offset[1])
-
-
-class QuitException(Exception):
-    pass
-
-
-# Decorator for static variables, from
-# https://stackoverflow.com/questions/279561/what-is-the-python-equivalent-of-static-variables-inside-a-function
-def static_vars(**kwargs):
-    def decorate(func):
-        for k in kwargs:
-            setattr(func, k, kwargs[k])
-        return func
-
-    return decorate
-
-
-def append_v(lst, v, n=1):
-    if v is None:
-        return lst
-    if len(lst) > n:
-        lst.pop(0)
-    lst.append(v)
 
 
 def mean_angles(lst):
@@ -120,71 +105,10 @@ def difference_of_angles(theta1, theta2):
     return math.atan2(math.sin(dt), math.cos(dt))
 
 
-def list_camera_properties(video_cap):
-    capture_properties = [('cv2.CAP_PROP_POS_MSEC', True),
-                          ('cv2.CAP_PROP_POS_FRAMES', False),
-                          ('cv2.CAP_PROP_POS_AVI_RATIO', False),
-                          ('cv2.CAP_PROP_FRAME_WIDTH', True),
-                          ('cv2.CAP_PROP_FRAME_HEIGHT', True),
-                          ('cv2.CAP_PROP_FPS', True),
-                          ('cv2.CAP_PROP_FOURCC', True),
-                          ('cv2.CAP_PROP_FRAME_COUNT', False),
-                          ('cv2.CAP_PROP_FORMAT', True),
-                          ('cv2.CAP_PROP_MODE', True),
-                          ('cv2.CAP_PROP_BRIGHTNESS', True),
-                          ('cv2.CAP_PROP_CONTRAST', True),
-                          ('cv2.CAP_PROP_SATURATION', True),
-                          ('cv2.CAP_PROP_HUE', False),
-                          ('cv2.CAP_PROP_GAIN', False),
-                          ('cv2.CAP_PROP_EXPOSURE', True),
-                          ('cv2.CAP_PROP_CONVERT_RGB', True),
-                          ('cv2.CAP_PROP_WHITE_BALANCE_BLUE_U', False),
-                          ('cv2.CAP_PROP_RECTIFICATION', False),
-                          ('cv2.CAP_PROP_MONOCHROME', False),
-                          ('cv2.CAP_PROP_SHARPNESS', True),
-                          ('cv2.CAP_PROP_AUTO_EXPOSURE', True),
-                          ('cv2.CAP_PROP_GAMMA', False),
-                          ('cv2.CAP_PROP_TEMPERATURE', True),
-                          ('cv2.CAP_PROP_TRIGGER', False),
-                          ('cv2.CAP_PROP_TRIGGER_DELAY', False),
-                          ('cv2.CAP_PROP_WHITE_BALANCE_RED_V', False),
-                          ('cv2.CAP_PROP_ZOOM', True),
-                          ('cv2.CAP_PROP_FOCUS', True),
-                          ('cv2.CAP_PROP_GUID', False),
-                          ('cv2.CAP_PROP_ISO_SPEED', False),
-                          ('cv2.CAP_PROP_BACKLIGHT', True),
-                          ('cv2.CAP_PROP_PAN', True),
-                          ('cv2.CAP_PROP_TILT', True),
-                          ('cv2.CAP_PROP_ROLL', False),
-                          ('cv2.CAP_PROP_IRIS', False),
-                          ('cv2.CAP_PROP_SETTINGS', False),
-                          ('cv2.CAP_PROP_BUFFERSIZE', True),
-                          ('cv2.CAP_PROP_AUTOFOCUS', True),
-                          ('cv2.CAP_PROP_SAR_NUM', False),
-                          ('cv2.CAP_PROP_SAR_DEN', False),
-                          ('cv2.CAP_PROP_BACKEND', True),
-                          ('cv2.CAP_PROP_CHANNEL', True),
-                          ('cv2.CAP_PROP_AUTO_WB', True),
-                          ('cv2.CAP_PROP_WB_TEMPERATURE', True)
-                          ]
-
-    for nm, v in capture_properties:
-        if v:
-            print(nm, video_cap.get(eval(nm)))
-
-
-def set_camera_properties(video_cap):
-    # capture_properties = [('cv2.CAP_PROP_FRAME_WIDTH', 1280),
-    #                       ('cv2.CAP_PROP_FRAME_HEIGHT', 720)
-    #                       ]
-
-    capture_properties = [('cv2.CAP_PROP_FRAME_WIDTH', 640),
-                          ('cv2.CAP_PROP_FRAME_HEIGHT', 480)
-                          ]
-
-    for nm, v in capture_properties:
-        if not video_cap.set(eval(nm), v):
-            print('Unable to set', nm, v)
+def line_angle(pt1, pt2):
+    delta_x = pt2[0] - pt1[0]
+    delta_y = pt2[1] - pt1[1]
+    return math.atan2(delta_y, delta_x) + math.pi / 2.
 
 
 # Surprisingly, there is no skeletonization method in OpenCV. It seems common
@@ -256,16 +180,12 @@ def filter_lines(lines, image_center, cutoff=5):
         if md is not None:
             _, (x1, y1, x2, y2) = m_lst[0], m_lst[1][0]
 
-            delta_x = x1 - x2
-            delta_y = y1 - y2
-            a0 = math.atan2(delta_y, delta_x) + math.pi / 2.
+            a0 = line_angle((x1, y1), (x2, y2))
 
             for lst in lines2:
                 inc, (x1, y1, x2, y2) = lst[0], lst[1][0]
                 if inc:
-                    delta_x = x1 - x2
-                    delta_y = y1 - y2
-                    a1 = math.atan2(delta_y, delta_x) + math.pi / 2.
+                    a1 = line_angle((x1, y1), (x2, y2))
 
                     mt = difference_of_angles(a0, a1)
                     inc = inc and abs(mt) < math.pi / 8.
@@ -306,17 +226,11 @@ def summarize_lines(lines, image_center):
         inc, (x1, y1, x2, y2) = lst[0], lst[1][0]
 
         if inc:
+            pt0 = image_center
             pt1 = (x1, y1)
             pt2 = (x2, y2)
 
-            pt0 = image_center
-
-            def h(pt0, pt):
-                delta_x = pt[0] - pt0[0]
-                delta_y = pt[1] - pt0[1]
-                return math.atan2(delta_y, delta_x) + math.pi / 2.
-
-            aa += [h(pt0, pt1), h(pt0, pt2)]
+            aa += [line_angle(pt0, pt1), line_angle(pt0, pt2)]
 
     theta = None
     if aa:
@@ -325,7 +239,7 @@ def summarize_lines(lines, image_center):
     return theta
 
 
-def black_arrow_mask(image, image_center):
+def gen_black_arrow_mask(image, image_center):
     mask = np.zeros(image.shape, dtype=image.dtype)
 
     # cv2.circle(mask, image_center, c_black_outer_mask_r, (255, 255, 255), -1)
@@ -336,7 +250,7 @@ def black_arrow_mask(image, image_center):
     return mask
 
 
-def red_arrow_mask(image, image_center):
+def gen_red_arrow_mask(image, image_center):
     mask = np.zeros(image.shape, dtype=image.dtype)
 
     cv2.circle(mask, image_center, c_red_outer_mask_r, (255, 255, 255), -1)
@@ -346,7 +260,7 @@ def red_arrow_mask(image, image_center):
 
 
 def black_arrow_segment(image, image_center):
-    mask = black_arrow_mask(image, image_center)
+    mask = gen_black_arrow_mask(image, image_center)
     image = cv2.bitwise_and(image, mask)
 
     if False:
@@ -380,7 +294,7 @@ def black_arrow_segment(image, image_center):
 
 
 def red_arrow_segment(image, image_center):
-    mask = red_arrow_mask(image, image_center)
+    mask = gen_red_arrow_mask(image, image_center)
     image = cv2.bitwise_and(image, mask)
 
     if True:
@@ -436,13 +350,13 @@ def red_arrow(image, image_center):
     return arrow_common(image, image_center, red_arrow_segment, c_red_hough_threshold, c_red_hough_min_line_length, c_red_hough_max_line_gap, c_red_drawn_line_length)
 
 
-@static_vars(tare_lst=[], tare_on=False)
+@common.static_vars(tare_lst=[], tare_on=False)
 def calc_mm(theta_b, theta_r):
     # Blend the course and find measurements of the red and black hands,
     # respectively and return final measurement.
 
     if calc_mm.tare_on:
-        append_v(calc_mm.tare_lst, (theta_b, theta_r), 200)
+        common.append_v(calc_mm.tare_lst, (theta_b, theta_r), 200)
         print('Tare', len(calc_mm.tare_lst), mean_angles([x[0] for x in calc_mm.tare_lst]), mean_angles([x[1] for x in calc_mm.tare_lst]))
 
     # Thetas come in as [0, Pi] and [-Pi, 0] so change that to [0, 2Pi]
@@ -492,41 +406,28 @@ def draw_labels(image, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final)
     cv2.putText(image, '{:6.3f} mm'.format(mm_final), (20, 30 * 1), c_label_font, c_label_s, c_label_color)
 
 
-@static_vars(fps_lst=[], fps_t1=None)
-def draw_fps(image):
-    if draw_fps.fps_t1 is None:
-        draw_fps.fps_t1 = time.time()
-        return
-    t2 = time.time()
-    append_v(draw_fps.fps_lst, 1. / (t2 - draw_fps.fps_t1), 90)
-    draw_fps.fps_t1 = t2
+def next_frame2(video_capture):
+    if c_demo_mode:
+        fn = 'tests/haimer_camera/640x480/h-2.png'
+        # fn_pat = 'tests/haimer_camera/640x480/mov_raw_{:06d}.ppm'
+        image0 = next_frame(video_capture, fn=fn)
+    else:
+        image0 = next_frame(video_capture)
 
-    fps = np.mean(draw_fps.fps_lst)
-
-    # cv2.putText(image, f'{fps:.2f} fps', (20, 30 * 2), c_label_font, c_label_s, c_label_color)
-    cv2.putText(image, '{:.2f} fps'.format(fps), (20, 30 * 2), c_label_font, c_label_s, c_label_color)
+    return image0
 
 
-_error_str = None
-
-
-def display_error(s):
-    global _error_str
-    _error_str = s
-
-
-@static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, record=False, record_ind=0)
+@common.static_vars(theta_b_l=[], theta_r_l=[], pause_updates=False, save=False, record=False, record_ind=0, debug_view=False, standalone=False)
 def get_measurement(video_capture):
     mm_final, mm_b, mm_r = None, None, None
 
-    retval, image0 = video_capture.read()
-    if not retval:
-        print('rv is false')
-        sys.exit(1)
-    if image0.size == 0:
-        print('image0 is empty')
-        sys.exit(1)
+    if not get_measurement.standalone:
+        get_measurement.record = False
+        get_measurement.save = False
 
+    build_all = get_measurement.record or get_measurement.save or get_measurement.debug_view
+
+    image0 = next_frame2(video_capture)
     h, w = image0.shape[:2]
     image_center = c_image_center(w, h)
 
@@ -545,8 +446,8 @@ def get_measurement(video_capture):
     # Maintain a list of valid thetas for times when no measurements are
     # available, such as when the black hand passes over the red hand, and
     # to use for noise reduction.
-    append_v(get_measurement.theta_b_l, theta_b)
-    append_v(get_measurement.theta_r_l, theta_r)
+    common.append_v(get_measurement.theta_b_l, theta_b)
+    common.append_v(get_measurement.theta_r_l, theta_r)
 
     if get_measurement.theta_b_l and get_measurement.theta_r_l:
         theta_b = mean_angles(get_measurement.theta_b_l)
@@ -554,25 +455,26 @@ def get_measurement(video_capture):
 
         mm_final, mm_b, mm_r = calc_mm(theta_b, theta_r)
 
-    # Draw outer circle dial and crosshairs on dial pivot.
-    cv2.circle(image1, (image_center), c_dial_outer_mask_r, c_line_color, c_line_s)
-    cv2.line(image1,
-             (image_center[0] - c_inner_mask_r, image_center[1] - c_inner_mask_r),
-             (image_center[0] + c_inner_mask_r, image_center[1] + c_inner_mask_r),
-             c_line_color, 1)
-    cv2.line(image1,
-             (image_center[0] - c_inner_mask_r, image_center[1] + c_inner_mask_r),
-             (image_center[0] + c_inner_mask_r, image_center[1] - c_inner_mask_r),
-             c_line_color, 1)
+    if build_all:
+        # Draw outer circle dial and crosshairs on dial pivot.
+        cv2.circle(image1, image_center, c_dial_outer_mask_r, c_line_color, c_line_s)
+        cv2.line(image1,
+                 (image_center[0] - c_inner_mask_r, image_center[1] - c_inner_mask_r),
+                 (image_center[0] + c_inner_mask_r, image_center[1] + c_inner_mask_r),
+                 c_line_color, 1)
+        cv2.line(image1,
+                 (image_center[0] - c_inner_mask_r, image_center[1] + c_inner_mask_r),
+                 (image_center[0] + c_inner_mask_r, image_center[1] - c_inner_mask_r),
+                 c_line_color, 1)
 
-    # Draw black arrow mask
-    cv2.circle(image1, image_center, c_black_outer_mask_r, c_line_color, c_line_s)
-    cv2.ellipse(image1, image_center, c_black_outer_mask_e, 0, 0, 360, c_line_color, c_line_s)
-    cv2.circle(image1, image_center, c_inner_mask_r, c_line_color, c_line_s)
+        # Draw black arrow mask
+        cv2.circle(image1, image_center, c_black_outer_mask_r, c_line_color, c_line_s)
+        cv2.ellipse(image1, image_center, c_black_outer_mask_e, 0, 0, 360, c_line_color, c_line_s)
+        cv2.circle(image1, image_center, c_inner_mask_r, c_line_color, c_line_s)
 
-    # Draw red arrow mask
-    cv2.circle(image1, image_center, c_red_outer_mask_r, c_line_color, c_line_s)
-    cv2.circle(image1, image_center, c_inner_mask_r, c_line_color, c_line_s)
+        # Draw red arrow mask
+        cv2.circle(image1, image_center, c_red_outer_mask_r, c_line_color, c_line_s)
+        cv2.circle(image1, image_center, c_inner_mask_r, c_line_color, c_line_s)
 
     # Draw final marked up image
     mask = np.zeros(image2.shape, dtype=image2.dtype)
@@ -586,51 +488,77 @@ def get_measurement(video_capture):
 
         draw_labels(image2, image_b, image_r, theta_b, theta_r, mm_b, mm_r, mm_final)
 
-    draw_fps(image2)
+    img_all, img_all_resized = None, None
 
-    # Build and display composite image
-    img_all0 = np.vstack([image0, image1, image2])
-    img_all1 = np.vstack([seg_b, skel_b, image_b])
-    img_all2 = np.vstack([seg_r, skel_r, image_r])
-    img_all = np.hstack([img_all0, img_all1, img_all2])
-    if _error_str:
-        print(_error_str)
-        c_label_font_error = cv2.FONT_HERSHEY_SIMPLEX
-        c_label_color_error = (0, 0, 255)
-        c_label_s_error = 1.5
-        cv2.putText(img_all, 'WARNING: ' + _error_str, (200, img_all.shape[0] // 2 - 20), c_label_font_error, c_label_s_error, c_label_color_error, 3)
-    img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
+    if build_all:
+        # Build and display composite image
+        img_all0 = np.vstack([image0, image1, image2])
+        img_all1 = np.vstack([seg_b, skel_b, image_b])
+        img_all2 = np.vstack([seg_r, skel_r, image_r])
+        img_all = np.hstack([img_all0, img_all1, img_all2])
 
-    if get_measurement.record:
-        fn1 = 'mov_raw_{:06}.ppm'.format(get_measurement.record_ind)
-        cv2.imwrite(fn1, image0)
-        fn2 = 'mov_all_{:06}.ppm'.format(get_measurement.record_ind)
-        cv2.imwrite(fn2, img_all)
-        fn3 = 'mov_fin_{:06}.ppm'.format(get_measurement.record_ind)
-        cv2.imwrite(fn3, image2)
-        get_measurement.record_ind += 1
-        print('Recorded {} {}'.format(fn1, fn2))
+    img_b = cv2.resize(image_b, None, fx=0.5, fy=0.5)
+    img_r = cv2.resize(image_r, (image2.shape[1] - img_b.shape[1], image2.shape[0] - img_b.shape[0]))
+    img_simple = np.vstack([image2, np.hstack([img_b, img_r])])
 
-    if not get_measurement.pause_updates:
-        cv2.imshow("Live", img_all_resized)
-    key = cv2.waitKey(5)
+    if get_measurement.standalone:
+        common.draw_fps(img_simple)
+        if build_all:
+            common.draw_fps(img_all, append_t=False)
+
+    if build_all:
+        img_all_resized = cv2.resize(img_all, None, fx=c_final_image_scale_factor, fy=c_final_image_scale_factor)
+
+    if get_measurement.debug_view:
+        final_img = img_all_resized
+    else:
+        final_img = img_simple
+
+    if get_measurement.standalone:
+        common.draw_error(final_img)
+
+        if get_measurement.record:
+            fn1 = 'mov_raw_h_{:06}.ppm'.format(get_measurement.record_ind)
+            cv2.imwrite(fn1, image0)
+            fn2 = 'mov_all_h_{:06}.ppm'.format(get_measurement.record_ind)
+            cv2.imwrite(fn2, img_all)
+            fn3 = 'mov_fin_h_{:06}.ppm'.format(get_measurement.record_ind)
+            cv2.imwrite(fn3, image2)
+            fn4 = 'mov_sim_h_{:06}.ppm'.format(get_measurement.record_ind)
+            cv2.imwrite(fn4, img_simple)
+            get_measurement.record_ind += 1
+            print('Recorded {} {} {} {}'.format(fn1, fn2, fn3, fn4))
+
+        if get_measurement.save:
+            get_measurement.save = False
+
+            for i in range(100):
+                # fn1 = f'raw_h_{i:03}.png'
+                fn1 = 'raw_h_{:03}.png'.format(i)
+                if not os.path.exists(fn1):
+                    cv2.imwrite(fn1, image0)
+                    # fn2 = f'all_h_{i:03}.png'
+                    fn2 = 'all_h_{:03}.png'.format(i)
+                    cv2.imwrite(fn2, img_all)
+                    fn3 = 'sim_h_{:03}.png'.format(i)
+                    cv2.imwrite(fn3, img_simple)
+                    # print(f'Wrote images {fn1} and {fn2}')
+                    print('Wrote images {} {} {}'.format(fn1, fn2, fn3))
+                    break
+
+    return mm_final, final_img
+
+
+def process_key(key):
     if key == ord('p'):
         get_measurement.pause_updates = not get_measurement.pause_updates
     elif key == ord('r'):
         get_measurement.record = not get_measurement.record
     elif key == ord('s'):
-        for i in range(100):
-            # fn1 = f'raw_{i:03}.png'
-            fn1 = 'raw_{:03}.png'.format(i)
-            if not os.path.exists(fn1):
-                cv2.imwrite(fn1, image0)
-                # fn2 = f'all_{i:03}.png'
-                fn2 = 'all_{:03}.png'.format(i)
-                cv2.imwrite(fn2, img_all)
-                # print(f'Wrote images {fn1} and {fn2}')
-                print('Wrote images {} and {}'.format(fn1, fn2))
-                break
-    elif key == ord('t'):
+        get_measurement.save = True
+    elif key == ord('d'):
+        get_measurement.debug_view = not get_measurement.debug_view
+    elif key == ord('z'):
         if calc_mm.tare_on:
             calc_mm.tare_lst = []
             calc_mm.tare_on = False
@@ -647,37 +575,45 @@ def get_measurement(video_capture):
         elif key == 84:  # KEY_DOWN
             c_center_offset[1] += 1
         print('c_center_offset:', c_center_offset)
-    elif key == ord('q'):
-        raise QuitException
+    elif key in [27, ord('q')]:  # Escape or q
+        raise common.QuitException
     elif key >= 0:
         # print(key)
-        pass
+        return False
 
-    return mm_final, key
+    return True
 
 
 def gauge_vision_setup():
-    np.set_printoptions(precision=2)
+    if c_demo_mode:
+        return None
 
-    video_capture = cv2.VideoCapture(0)
+    video_capture = cv2.VideoCapture(1)
     if not video_capture.isOpened():
         print('camera is not open')
         sys.exit(1)
 
-    set_camera_properties(video_capture)
-    # list_camera_properties(video_capture)
+    camera.set_camera_properties(video_capture, '640x480')
+    # camera.list_camera_properties(video_capture)
 
     return video_capture
 
 
 def main():
+    np.set_printoptions(precision=2)
+
     video_capture = gauge_vision_setup()
+    get_measurement.standalone = True
 
     while True:
         try:
-            mm_final, key = get_measurement(video_capture)
+            mm_final, final_img = get_measurement(video_capture)
+            if not get_measurement.pause_updates:
+                cv2.imshow(c_camera_name, final_img)
+            key = cv2.waitKey(5) & 0xff
+            process_key(key)
             # print('mm_final:', mm_final)
-        except QuitException:
+        except common.QuitException:
             break
 
 

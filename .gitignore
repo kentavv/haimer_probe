@@ -1,4 +1,8 @@
+*.csv
+*.sw?
 *.ppm
+*.pgm
+*.png
 *.mp4
 
 # Byte-compiled / optimized / DLL files
