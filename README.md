@@ -5,7 +5,8 @@ Use machine vision to 1) read the mechanical gauge dial face of a Haimer 3D Sens
 
 A Microsoft LifeCam Cinema webcam is attached to a Haimer 3D Taser with a 3d printed part. The software monitors the two hands of the dial face, presenting debug views, and returning the combined value of the two dials. Keyboard commands begin edge probing and circle center locating. This code is then extended with a second downward facing webcam that detects and estimates dimensions of holes. The dimensions of the holes are then directly measured with the Haimer probe.
 
-Examples of use are shown at: https://www.youtube.com/watch?v=w3novypPqos
+Examples of identifying and probing holes: https://www.youtube.com/watch?v=7mBQwIzaiaQ
+Examples of reading mechanical gauge: https://www.youtube.com/watch?v=w3novypPqos
 
 ## Keyboard commands (haimer_camera.py)
 * p: toggle display updates, image analysis continues
